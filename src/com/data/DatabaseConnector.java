@@ -2438,7 +2438,7 @@ public class DatabaseConnector
 		disconnect();
 	}
 	
-	public synchronized void writeUserRequest(String userName, String email, String fname, String mname, String lname, String pass, String message, String type)
+	public synchronized void writeUserRequest(String userName, String email, String fname, String mname, String lname, String pass, String message, String type) throws Exception
 	{
 		String salt = UUID.randomUUID().toString();
 		
@@ -2466,8 +2466,9 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			e.printStackTrace();
 			disconnect();
+			throw e;
+			//e.printStackTrace();
 			//return;
 		}
 		disconnect();

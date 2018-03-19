@@ -45,19 +45,29 @@
 		String newUserMessage = request.getParameter("message");
 		String newUserType = request.getParameter("userType");
 		
-		myConnector.writeUserRequest(newUserName, newUserEmail, newUserFname, newUserMname, newUserLname, newUserPass, newUserMessage, newUserType);
+		String messageText = "";
+		try
+		{
+			myConnector.writeUserRequest(newUserName, newUserEmail, newUserFname, newUserMname, newUserLname, newUserPass, newUserMessage, newUserType);
+			messageText = "Thank you for signing up!  You will be notified when your accound is created.";
+		}
+		catch(Exception e)
+		{
+			messageText = "There was an error when creating your account.  That error caused the exception " + e;
+		}
 		
 		%>
         </div>
         <div align="center" id="inner_content_slogan">
-        Obfuscation Made Easy</div>
+        <%=messageText %>
+        </div>
         </td>
         </tr>
         </table>
         </div>
         </td>
     </tr>
-	<tr>
+	<tr style="display:none">
     	<td width="25%">
         <table class="inner_content_table">
         <tr>
