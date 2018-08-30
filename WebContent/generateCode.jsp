@@ -226,6 +226,16 @@
 	        		isCompiled=true;
 	        		//cmdArray = new String[4+splitString.length];
 	        	}
+	        	else if(((DBObj)myChallengesFull.get(x)).getAttribute("commandName").equals("./package.sh") || ((DBObj)myChallengesFull.get(x)).getAttribute("commandName").equals("./link.sh"))
+	        	{
+	        		secondCmdArray = new String[3];
+	        		//cmdArray = new String[4+splitString.length];
+	        	}
+	        	else if(((DBObj)myChallengesFull.get(x)).getAttribute("commandName").equals("./deextern.sh"))
+	        	{
+	        		secondCmdArray = new String[3];
+	        		//cmdArray = new String[4+splitString.length];
+	        	}
 	        	
 	        	//cmdArray = new String[1];
 	        	//cmdArray[0]="cat";
@@ -233,6 +243,14 @@
 	        	String curCommandName=(String)((DBObj)myChallengesFull.get(x)).getAttribute("commandName");
 	        	
 	        	if(curCommandName.equals("gcc"))
+	        	{
+	        		cmdArray = new String[3+splitString.length];
+	        	}
+	        	else if(curCommandName.equals("./package.sh") || curCommandName.equals("./link.sh"))
+	        	{
+	        		cmdArray = new String[4+splitString.length];
+	        	}
+	        	else if(curCommandName.equals("./deextern.sh"))
 	        	{
 	        		cmdArray = new String[3+splitString.length];
 	        	}
@@ -260,6 +278,33 @@
 		        	//secondCmdArray[1]=weirdOutputFile;
 		        	//secondCmdArray[2]=outputFile;
 		        	//secondCmdArray=null;
+	        	}
+	        	else if(cmdArray[0].equals("./package.sh") || cmdArray[0].equals("./link.sh"))
+	        	{
+	        		//outputFile = "./"+outputFile;
+	        		cmdArray[splitString.length+2]=genDir.getAbsolutePath()+"/"+outputFile;
+	        		//cmdArray[splitString.length+3]=outputFile;
+		        	cmdArray[splitString.length+1]=genDir.getAbsolutePath()+"/"+prevFile;
+		        	cmdArray[splitString.length+3]=tmpFile.getAbsolutePath() + "/" + "jitter-amd64.c";
+		        	//tmpFile=new File(genDir.getAbsolutePath());
+		        	//String weirdOutputFile="\\ "+outputFile;
+		        	//secondCmdArray[0]="mv";
+		        	//secondCmdArray[1]=weirdOutputFile;
+		        	//secondCmdArray[2]=outputFile;
+		        	secondCmdArray=null;
+	        	}
+	        	else if(cmdArray[0].equals("./deextern.sh"))
+	        	{
+	        		//outputFile = "./"+outputFile;
+	        		cmdArray[splitString.length+2]=genDir.getAbsolutePath()+"/"+outputFile;
+	        		//cmdArray[splitString.length+3]=outputFile;
+		        	cmdArray[splitString.length+1]=genDir.getAbsolutePath()+"/"+prevFile;
+		        	//tmpFile=new File(genDir.getAbsolutePath());
+		        	//String weirdOutputFile="\\ "+outputFile;
+		        	//secondCmdArray[0]="mv";
+		        	//secondCmdArray[1]=weirdOutputFile;
+		        	//secondCmdArray[2]=outputFile;
+		        	secondCmdArray=null;
 	        	}
 	        	////System.out.println("./tigress "+(String)((DBObj)myChallengesFull.get(x)).getAttribute("command")+" --out="+genDir.getAbsolutePath()+"/"+outputFile+" "+genDir.getAbsolutePath()+"/"+prevFile);
 	        	//String[] cmdArray = {"./tigress ", (String)((DBObj)myChallengesFull.get(x)).getAttribute("command"), "--out="+genDir.getAbsolut;ePath()+"/"+outputFile, genDir.getAbsolutePath()+"/"+prevFile};//{"printenv"};//, "export TIGRESS_HOME="+tmpFile.getAbsolutePath(), "printenv"};
