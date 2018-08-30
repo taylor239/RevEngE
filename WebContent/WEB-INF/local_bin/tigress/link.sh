@@ -5,7 +5,8 @@ echo $2
 echo $3
 
 rm $2
+touch $2
 echo "" > $2
-echo "#include \"$3\"" >> $2
+echo "#include $3" >> $2
 echo "" >> $2
 cat $1 >> $2
