@@ -409,7 +409,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        				{
 	    	        					Random tmpRand = new SecureRandom();
 	    	        					long tmpLong = tmpRand.nextLong();
-	    	        					while(tmpLong > Math.pow(10, x + 1) || -tmpLong > Math.pow(10, x + 1))
+	    	        					while(tmpLong > Math.pow(10, y + 1) || -tmpLong > Math.pow(10, y + 1))
 	    	        					{
 	    	        						tmpLong = tmpLong/2;
 	    	        					}
@@ -419,7 +419,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        				{
 	    	        					Random tmpRand = new SecureRandom();
 	    	        					int tmpInt = tmpRand.nextInt();
-	    	        					while(tmpInt > Math.pow(10, x + 1) || -tmpInt > Math.pow(10, x + 1))
+	    	        					while(tmpInt > Math.pow(10, y + 1) || -tmpInt > Math.pow(10, y + 1))
 	    	        					{
 	    	        						tmpInt = tmpInt/2;
 	    	        					}
@@ -427,6 +427,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        				}
 	    	        			}
 	    	        			runCmdArray[6+z] = value;
+	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Testing case: " + value + " <br />\";</script>");
 	        				}
 	        				runCmdArray[5] = genDir+"/grading.out";
 	    	        		
@@ -452,6 +453,11 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        		runCmdArray[5] = genDir+"/submitted.out";
 	    	        		String submittedOutput = nativeInterface.executeCommand(runCmdArray, tmpFile, environmentalVars, 500000000, outputForce);
 	    	        		
+	    	        		
+	    	        		if(gradingOutput.contains("Err: Timeout"))
+	    	        		{
+	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Code too slow: timeout." + " <br />\";</script>");
+	    	        		}
 	    	        		//System.out.println(gradingOutput);
 	    	        		
 	    	        		Scanner tmpScanner = new Scanner(gradingOutput);
@@ -580,11 +586,13 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 		    	        		}
 	    	        			if(perfFail)
 	    	        			{
+	    	        				redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Fail: Code executes too many instructions." + " <br />\";</script>");
 	    	        				numPerformanceFailures++;
 	    	        			}
 	    	        		}
 	    	        		else
 	    	        		{
+	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Fail: Input/output incorrect." + " <br />\";</script>");
 	    	        			numFailures++;
 	    	        		}
 	        			}

@@ -299,6 +299,8 @@ public class ServerManager
 		if(System.nanoTime() - startTime > timeout)
 		{
 			stopprocess.destroyForcibly();
+			myReturn+='\n';
+			myReturn+="Err: Timeout";
 		}
 		int exitVal=stopprocess.waitFor();
 		//System.out.println("Exited with error code "+exitVal);
