@@ -67,6 +67,7 @@
         <tr>
         <td id="gradeContent">
         Grading initialized...<br />
+        Auto grading tests your code to determine whether it (1) matches the original (non obfuscated) code in input and output, and (2) matches the original code in performance based on counts of instructions performed.  The grading program has a timeout, where if your code takes too long to execute it is considered incorrect.<br />
         </td>
         </tr>
         </table>
