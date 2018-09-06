@@ -457,7 +457,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        		String submittedOutput = nativeInterface.executeCommand(runCmdArray, tmpFile, environmentalVars, 1500000000, outputForce);
 	    	        		
 	    	        		
-	    	        		if(gradingOutput.contains("Err: Timeout"))
+	    	        		if(submittedOutput.contains("Err: Timeout"))
 	    	        		{
 	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Code too slow: timeout." + " <br />\";</script>");
 	    	        		}
