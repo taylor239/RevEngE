@@ -461,6 +461,10 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        		{
 	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Code too slow: timeout." + " <br />\";</script>");
 	    	        		}
+	    	        		if(gradingOutput.contains("Err: Timeout"))
+	    	        		{
+	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Server too busy, timeout on original code." + " <br />\";</script>");
+	    	        		}
 	    	        		//System.out.println(gradingOutput);
 	    	        		
 	    	        		Scanner tmpScanner = new Scanner(gradingOutput);
