@@ -182,12 +182,15 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	        	}
 	        	if((byte[])((DBObj)curChallenge.get(0)).getAttribute("gradingFile") != null && ((byte[])((DBObj)curChallenge.get(0)).getAttribute("gradingFile")).length > 0)
 	        	{
+	        		new File(genDir + "/grading.c").delete();
 	        		FileUtils.writeByteArrayToFile(new File(genDir + "/grading.c"), (byte[])((DBObj)curChallenge.get(0)).getAttribute("gradingFile"));
 	        	}
 	        	else
 	        	{
+	        		new File(genDir + "/grading.c").delete();
 	        		FileUtils.writeByteArrayToFile(new File(genDir + "/grading.c"), (byte[])((DBObj)curChallenge.get(0)).getAttribute("originalFile"));
 	        	}
+	        	new File(genDir + "/submitted.c").delete();
 	        	FileUtils.writeByteArrayToFile(new File(genDir + "/submitted.c"), (byte[])((DBObj)curChallenge.get(0)).getAttribute("submittedFile"));
 	        	
 	        	
@@ -448,10 +451,10 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        			outputForce.add(((DBObj)outputInput.get(z)).getAttribute("input_string"));
 	    	        		}
 	    	        		
-	    	        		String gradingOutput = nativeInterface.executeCommand(runCmdArray, tmpFile, environmentalVars, 500000000, outputForce);
+	    	        		String gradingOutput = nativeInterface.executeCommand(runCmdArray, tmpFile, environmentalVars, 1500000000, outputForce);
 	    	        		
 	    	        		runCmdArray[5] = genDir+"/submitted.out";
-	    	        		String submittedOutput = nativeInterface.executeCommand(runCmdArray, tmpFile, environmentalVars, 500000000, outputForce);
+	    	        		String submittedOutput = nativeInterface.executeCommand(runCmdArray, tmpFile, environmentalVars, 1500000000, outputForce);
 	    	        		
 	    	        		
 	    	        		if(gradingOutput.contains("Err: Timeout"))
