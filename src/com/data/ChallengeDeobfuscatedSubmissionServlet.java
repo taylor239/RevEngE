@@ -431,6 +431,12 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        			}
 	    	        			runCmdArray[6+z] = value;
 	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Testing case: " + value + " <br />\";</script>");
+	    	        			for(int p=0; p<1000; p++)
+	    	    	        	{
+	    	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
+	    	    	        	}
+	    	        			redirectWriter.flush();
+	    	    	    		response.flushBuffer();
 	        				}
 	        				runCmdArray[5] = genDir+"/grading.out";
 	    	        		
@@ -460,10 +466,22 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        		if(submittedOutput.contains("Err: Timeout"))
 	    	        		{
 	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Code too slow: timeout." + " <br />\";</script>");
+	    	        			for(int z=0; z<1000; z++)
+	    	    	        	{
+	    	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
+	    	    	        	}
+	    	        			redirectWriter.flush();
+	    	    	    		response.flushBuffer();
 	    	        		}
 	    	        		if(gradingOutput.contains("Err: Timeout"))
 	    	        		{
 	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Server too busy, timeout on original code." + " <br />\";</script>");
+	    	        			for(int z=0; z<1000; z++)
+	    	    	        	{
+	    	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
+	    	    	        	}
+	    	        			redirectWriter.flush();
+	    	    	    		response.flushBuffer();
 	    	        		}
 	    	        		//System.out.println(gradingOutput);
 	    	        		
@@ -595,12 +613,24 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        			{
 	    	        				redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Fail: Code executes too many instructions." + " <br />\";</script>");
 	    	        				numPerformanceFailures++;
+	    	        				for(int z=0; z<1000; z++)
+	    		    	        	{
+	    		    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
+	    		    	        	}
+	    	        				redirectWriter.flush();
+	    		    	    		response.flushBuffer();
 	    	        			}
 	    	        		}
 	    	        		else
 	    	        		{
 	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Fail: Input/output incorrect." + " <br />\";</script>");
 	    	        			numFailures++;
+	    	        			for(int z=0; z<1000; z++)
+	    	    	        	{
+	    	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
+	    	    	        	}
+	    	        			redirectWriter.flush();
+	    	    	    		response.flushBuffer();
 	    	        		}
 	        			}
 	        			System.out.println("Failed " + numFailures + " out of " + numIterations);
