@@ -838,7 +838,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 		else
 		{
 			PrintWriter redirectWriter = response.getWriter();
-			//redirectWriter.println("<html><head><meta http-equiv=\"refresh\" content=\"0; url=myChallenges.jsp\" /></head></html>");
+			redirectWriter.println("<html><head><meta http-equiv=\"refresh\" content=\"0; url=myChallenges.jsp?alert_message=Submission received!\" /></head></html>");
 			redirectWriter.flush();
 			response.flushBuffer();
 		}
