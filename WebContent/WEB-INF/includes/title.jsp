@@ -112,6 +112,7 @@
 		
 		<li onclick="window.document.location='adminChallenges.jsp';">View Challenges</li>
 		
+		<li onclick="window.document.location='announcement.jsp';">Make Announcement</li>
 		
 		</ul>
       </td>
@@ -145,6 +146,8 @@
 		<li class="greyed">Create Challenge</li>
 		
 		<li class="greyed">View Challenges</li>
+		
+		<li class="greyed">Make Announcement</li>
 		
 		</ul>
       </td>
