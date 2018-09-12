@@ -52,6 +52,8 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	 */
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
 	{
+		EmailSender mySender = EmailSender.getEmailSender("revenge@cs.arizona.edu");
+		
 		HttpSession session = request.getSession(true);
 		TrafficAnalyzer accessor=TrafficAnalyzerPool.getAnalyzer();
 		if(!accessor.allowImage(request.getRemoteAddr()+"image"))
@@ -107,6 +109,8 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 		//response.getWriter().append("Served at: ").append(request.getContextPath());
 		
 		ArrayList curChallenge = myConnector.getChallenge(challengeName, (String)myUser.getAttribute("email"));
+		DBObj topChallenge = (DBObj)curChallenge.get(0);
+		String toEmail = "Your submission for " + challengeName + " was received on " + topChallenge.getAttribute("submissionTime") + ".  Your submission output is as follows:\n";
 		//System.out.println(((DBObj)curChallenge.get(0)).getAttributes());
 		myConnector.removeChallengeParticipantTests(challengeName, (String)myUser.getAttribute("email"));
 		
@@ -374,6 +378,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	        			int numFailures = 0;
 	        			int numPerformanceFailures = 0;
 	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Testing " + numIterations + " values." + " <br />\";</script>");
+	        			toEmail += "Testing " + numIterations + " values." + "\n";
 	        			for(int y=0; y<1000; y++)
 	    	        	{
 	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
@@ -431,6 +436,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        			}
 	    	        			runCmdArray[6+z] = value;
 	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Testing case: " + value + " <br />\";</script>");
+	    	        			toEmail += "Testing case: " + value + "\n";
 	    	        			for(int p=0; p<1000; p++)
 	    	    	        	{
 	    	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
@@ -466,6 +472,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        		if(submittedOutput.contains("Err: Timeout"))
 	    	        		{
 	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Code too slow: timeout." + " <br />\";</script>");
+	    	        			toEmail += "Code too slow: timeout." + "\n";
 	    	        			for(int z=0; z<1000; z++)
 	    	    	        	{
 	    	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
@@ -476,6 +483,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        		if(gradingOutput.contains("Err: Timeout"))
 	    	        		{
 	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Server too busy, timeout on original code." + " <br />\";</script>");
+	    	        			toEmail += "Server too busy, timeout on original code." + "\n";
 	    	        			for(int z=0; z<1000; z++)
 	    	    	        	{
 	    	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
@@ -612,6 +620,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        			if(perfFail)
 	    	        			{
 	    	        				redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Fail: Code executes too many instructions." + " <br />\";</script>");
+	    	        				toEmail += "Fail: Code executes too many instructions." + "\n";
 	    	        				numPerformanceFailures++;
 	    	        				for(int z=0; z<1000; z++)
 	    		    	        	{
@@ -624,6 +633,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        		else
 	    	        		{
 	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Fail: Input/output incorrect." + " <br />\";</script>");
+	    	        			toEmail += "Fail: Input/output incorrect." + "\n";
 	    	        			numFailures++;
 	    	        			for(int z=0; z<1000; z++)
 	    	    	        	{
@@ -666,6 +676,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        		}
 	    	        	}
 	    	        	redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + textToInsert + " <br />\";</script>");
+	    	        	toEmail += textToInsert + "\n";
 	    	        	for(int y=0; y<1000; y++)
 	    	        	{
 	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
@@ -843,6 +854,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 			response.flushBuffer();
 		}
 		response.flushBuffer();
+		mySender.sendEmail((String)myUser.getAttribute("email"), "Submission Received for " + challengeName, toEmail);
 	}
 
 	/**
