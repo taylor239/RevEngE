@@ -53,6 +53,8 @@
         
         boolean randSeed = (boolean)((DBObj)myChallengesFull.get(0)).getAttribute("randomSeed");
         
+        boolean isCached = false;
+        
         if(randSeed)
         {
         	Random rand = new SecureRandom();
@@ -61,7 +63,20 @@
         else
         {
         	seed = new Integer((String)((DBObj)myChallengesFull.get(0)).getAttribute("seed"));
+        	isCached = (((DBObj)myChallengesFull.get(0)).containsKey("cachedOriginal") && ((DBObj)myChallengesFull.get(0)).getAttribute("cachedOriginal") != null && ((DBObj)myChallengesFull.get(0)).getAttribute("cachedOriginal") instanceof byte[]);
         }
+        
+        System.out.println("Has cached files: " + isCached);
+        //System.out.println(((DBObj)myChallengesFull.get(0)).getAttribute("cachedOriginal"));
+        
+        if(isCached)
+        {
+        	ArrayList myChallenges = new ArrayList();
+            myChallenges.add(myChallengesFull.get(0));
+        	myConnector.challengeParticipantCodeWritten((String)((DBObj)myChallenges.get(0)).getAttribute("challenge_name"), (String)((DBObj)myChallenges.get(0)).getAttribute("email"), ((byte[])((DBObj)myChallengesFull.get(0)).getAttribute("cachedOriginal")), ((byte[])((DBObj)myChallengesFull.get(0)).getAttribute("cachedGrading")), ((byte[])((DBObj)myChallengesFull.get(0)).getAttribute("cachedObfuscated")), seed);
+        }
+        else
+        {
         
         boolean isCompiled = false;
         for(int x=0; x<myChallengesFull.size(); x++)
@@ -295,7 +310,12 @@
         ArrayList myChallenges = new ArrayList();
         myChallenges.add(myChallengesFull.get(0));
         myConnector.challengeParticipantCodeWritten((String)((DBObj)myChallenges.get(0)).getAttribute("challenge_name"), (String)((DBObj)myChallenges.get(0)).getAttribute("email"), firstFileData, gradingFileData, finalFileData, seed);
+        if(!randSeed)
+        {
+        	myConnector.cacheChallengeCode((String)((DBObj)myChallenges.get(0)).getAttribute("challenge_name"), firstFileData, gradingFileData, finalFileData);
+        }
         System.out.println("Seed was: " + seed);
+        }
         //String forwardURL = "viewChallenge.jsp?challengeName="+((DBObj)myChallenges.get(0)).getAttribute("challenge_name");
         
         %>

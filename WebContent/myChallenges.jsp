@@ -211,6 +211,9 @@
         			|| tmp.equals("performance_multiplier")
         			|| tmp.equals("seed")
         			|| tmp.equals("randomSeed")
+        			|| tmp.equals("cachedOriginal")
+        			|| tmp.equals("cachedGrading")
+        			|| tmp.equals("cachedObfuscated")
         			|| tmp.equals("participantSeed"))
         	{
         		keys.remove(x);
