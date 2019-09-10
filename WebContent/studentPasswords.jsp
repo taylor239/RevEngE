@@ -183,6 +183,7 @@
     	<div align="center">
     	<input type="hidden" name="numStudents" value="<%=myChallenges.size() %>"></input>
     	<input type="submit" value="CSV Export"></input>
+    	<input type="submit" formaction="emailPasswords" value="Email Passwords"></input>
     	</div>
     	</td>
     	</tr>
