@@ -1,7 +1,9 @@
 package com.data;
 
 import java.io.IOException;
+import java.util.UUID;
 
+import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
@@ -35,14 +37,35 @@ public class InstallScriptServlet extends HttpServlet {
 		{
 			return;
 		}
+		
+		DatabaseInformationManager manager=DatabaseInformationManager.getInstance();
+		ServletContext sc=getServletContext();
+		String reportPath=sc.getRealPath("/WEB-INF/");
+		reportPath+="/databases.xml";
+		manager.addInfoFile(reportPath);
 		DatabaseConnector myConnector=(DatabaseConnector)session.getAttribute("connector");
 		if(myConnector==null)
 		{
 			myConnector=new DatabaseConnector("pillar");
+			try {
+				myConnector.connect();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			session.setAttribute("connector", myConnector);
 		}
 		
-		User myUser=(User)session.getAttribute("user");
+		User myUser = null;
+		System.out.println("Looking for user params");
+		if(request.getParameter("email")!=null && request.getParameter("password")!=null)
+		{
+			System.out.println("Attempting sign in " + request.getParameter("email"));
+			myUser=myConnector.signIn(request.getParameter("email"), request.getParameter("password"), request.getRemoteAddr());
+			session.setAttribute("user", myUser);
+		}
+		
+		myUser=(User)session.getAttribute("user");
 		
 		if(myUser == null)
 		{
@@ -62,7 +85,9 @@ public class InstallScriptServlet extends HttpServlet {
 		String serverName = "revenge.cs.arizona.edu";
 		String port = "80";
 		
-		String mariaPassword = "LFgVMrQ8rqR41StN";
+		int screenshotTime = 60000;
+		
+		String mariaPassword = "LFgVMrQ8rqR41StN";;
 		
 		String output = "#!/bin/bash" 
 		+ "\nclear" 
@@ -71,8 +96,8 @@ public class InstallScriptServlet extends HttpServlet {
 		+ "\n" 
 		+ "\necho \"\"" 
 		+ "\n" 
-		+ "\necho \"For students: revenge.cs.arizona.edu/RevEngE/Students.pdf\"" 
-		+ "\necho \"For anyone else: revenge.cs.arizona.edu/RevEngE/Professionals.pdf\"" 
+		+ "\necho \"For students: revenge.cs.arizona.edu/RevEngECompetition/Students.pdf\"" 
+		+ "\necho \"For anyone else: revenge.cs.arizona.edu/RevEngECompetition/Professionals.pdf\"" 
 		+ "\n" 
 		+ "\necho \"\"" 
 		+ "\n" 
@@ -92,45 +117,121 @@ public class InstallScriptServlet extends HttpServlet {
 		+ "\necho \"Starting data collection install\"" 
 		+ "\n" 
 		+ "\nsudo rm /var/lib/dpkg/lock"
+		+ "\nsudo rm /var/cache/apt/archives/lock"
 		+ "\nsudo dpkg --configure -a" 
 		+ "\nsudo apt-get -y clean" 
 		+ "\nsudo rm /var/lib/dpkg/lock"
+		+ "\nsudo rm /var/cache/apt/archives/lock"
 		+ "\nsudo dpkg --configure -a" 
 		+ "\nsudo apt-get -y update --fix-missing" 
 		+ "\nsudo rm /var/lib/dpkg/lock"
+		+ "\nsudo rm /var/cache/apt/archives/lock"
 		+ "\nsudo dpkg --configure -a" 
 		+ "\nsudo apt-get -y upgrade" 
 		+ "\nsudo rm /var/lib/dpkg/lock"
+		+ "\nsudo rm /var/cache/apt/archives/lock"
 		+ "\nsudo dpkg --configure -a" 
 		+ "\nsudo apt-get -y update --fix-missing" 
 		+ "\nsudo rm /var/lib/dpkg/lock"
+		+ "\nsudo rm /var/cache/apt/archives/lock"
 		+ "\nsudo dpkg --configure -a" 
 		+ "\nsudo apt-get -y dist-upgrade" 
 		+ "\nsudo rm /var/lib/dpkg/lock"
+		+ "\nsudo rm /var/cache/apt/archives/lock"
 		+ "\nsudo dpkg --configure -a" 
 		+ "\nsudo apt-get -y update --fix-missing" 
 		+ "\nsudo rm /var/lib/dpkg/lock"
+		+ "\nsudo rm /var/cache/apt/archives/lock"
 		+ "\nsudo dpkg --configure -a" 
 		+ "\nsudo apt-get -y install default-jre" 
+		+ "\nsudo apt-get -y install mariadb-server" 
 		+ "\nsudo apt-get -y install tomcat8" 
+		+ "\nsudo apt-get -y install tomcat9" 
 		//+ "\nsudo debconf-set-selections <<< 'mysql-server mysql-server/root_password password " + mySqlPassword + "'" 
 		//+ "\nsudo debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password " + mySqlPassword + "'" 
 		//+ "\nsudo apt-get -y install mysql-server" 
 		//+ "\nsudo apt-get -y install mysql-client" 
+		
++ "\n\nservice mysql start"
++ "\nmkdir -p /opt/dataCollector/" 
++ "\n\nwget http://" + serverName + ":" + port + "/DataCollectorServer/openDataCollection/endpointSoftware/dataCollection.sql -O /opt/dataCollector/dataCollection.sql"
++ "\n\nmariadb -u root < /opt/dataCollector/dataCollection.sql"
++ "\nmariadb -u root -e \"CREATE USER 'dataCollector'@'localhost' IDENTIFIED BY '" + mariaPassword + "';\""
++ "\nmariadb -u root -e \"GRANT USAGE ON *.* TO 'dataCollector'@'localhost' REQUIRE NONE WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0;\""
++ "\nmariadb -u root -e \"GRANT ALL PRIVILEGES ON dataCollection.* TO 'dataCollector'@'localhost';\""
++ "\n"
++ "\nwget http://" + serverName + ":" + port + "/DataCollectorServer/openDataCollection/endpointSoftware/CybercraftDataCollectionConnector.war -O /var/lib/tomcat8/webapps/CybercraftDataCollectionConnector.war"
++ "\nwget http://" + serverName + ":" + port + "/DataCollectorServer/openDataCollection/endpointSoftware/CybercraftDataCollectionConnector.war -O /var/lib/tomcat9/webapps/CybercraftDataCollectionConnector.war"
++ "\n"
++ "\n# Copy jar to install dir" 
++ "\n" 
++ "\n#mv ./DataCollector.jar /opt/dataCollector/" 
++ "\nwget http://" + serverName + ":" + port + "/DataCollectorServer/openDataCollection/endpointSoftware/DataCollector.jar -O /opt/dataCollector/DataCollector.jar" 
++ "\nchmod +777 /opt/dataCollector/DataCollector.jar" 
++ "\nchmod +x /opt/dataCollector/DataCollector.jar" 
++ "\n" 
++ "\n" 
++ "\ntee /opt/dataCollector/DataCollectorStart.sh > /dev/null <<'EOF'" 
++ "\n#!/bin/bash" 
+//+ "\nservice mysql start" 
+//+ "\nservice tomcat8 start"
+//+ "\nservice tomcat9 start"
++ "\nwhile true;" 
++ "\ndo" 
++ "\npkill -f \"/usr/bin/java -jar -XX:+IgnoreUnrecognizedVMOptions /opt/dataCollector/DataCollector.jar\"" 
+//+ "\n/usr/bin/java -Xmx1536m -jar /opt/dataCollector/DataCollector.jar -user " + curEmail + " -server " + serverName + ":" + port + " -event " + curEvent + " -continuous "+ myNewToken + " http://revenge.cs.arizona.edu/DataCollectorServer/openDataCollection/UploadData" + " >> /opt/dataCollector/log.log 2>&1" 
++ "\n/usr/bin/java -Xmx1536m -jar -XX:+IgnoreUnrecognizedVMOptions /opt/dataCollector/DataCollector.jar -user " + curEmail + " -server " + serverName + ":" + port + " -event RevEngECompetition -screenshot " + screenshotTime + " -adminemail cgtboy1988@yahoo.com >> /opt/dataCollector/log.log 2>&1" 
++ "\necho \"Got a crash: $(date)\" >> /opt/dataCollector/log.log" 
++ "\nsleep 2" 
++ "\ndone" 
++ "\nEOF" 
++ "\n" 
++ "\nchmod +777 /opt/dataCollector/DataCollectorStart.sh" 
++ "\nchmod +x /opt/dataCollector/DataCollectorStart.sh" 
++ "\n" 
++ "\ntouch /opt/dataCollector/log.log" 
++ "\nchmod +777 /opt/dataCollector/log.log" 
++ "\n" 
++ "\n# Launch script" 
++ "\n" 
++ "\nLOG_NAME=$(logname)" 
++ "\nmkdir /home/$LOG_NAME/.config/autostart/"
++ "\ntee /home/$LOG_NAME/.config/autostart/DataCollector.desktop > /dev/null <<'EOF'" 
++ "\n[Desktop Entry]" 
++ "\nType=Application" 
++ "\nExec=\"/opt/dataCollector/DataCollectorStart.sh\"" 
++ "\nHidden=false" 
++ "\nNoDisplay=false" 
++ "\nX-GNOME-Autostart-enabled=true" 
++ "\nName[en_IN]=DataCollector" 
++ "\nName=DataCollector" 
++ "\nComment[en_IN]=Collects data" 
++ "\nComment=Collects data" 
++ "\nEOF" 
++ "\n" 
+//+ "\nservice mysql start" 
+//+ "\nservice tomcat8 start"
+//+ "\nservice tomcat9 start"
++ "\n"
+//+ "\n/opt/dataCollector/DataCollectorStart.sh & disown" ;
++ "\nreboot" ;
+		
+		
+		/*
 		+ "\n\nservice mysql start"
 		+ "\nmkdir -p /opt/dataCollector/" 
-		+ "\n\nwget http://" + serverName + ":" + port + "/DataCollectorServer/endpointSoftware/dataCollection.sql -O /opt/dataCollector/dataCollection.sql"
+		+ "\n\nwget http://" + serverName + ":" + port + "/DataCollectorServer/openDataCollection/endpointSoftware/dataCollection.sql -O /opt/dataCollector/dataCollection.sql"
 		+ "\n\nmariadb -u root < /opt/dataCollector/dataCollection.sql"
 		+ "\nmariadb -u root -e \"CREATE USER 'dataCollector'@'localhost' IDENTIFIED BY '" + mariaPassword + "';\""
 		+ "\nmariadb -u root -e \"GRANT USAGE ON *.* TO 'dataCollector'@'localhost' REQUIRE NONE WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0;\""
 		+ "\nmariadb -u root -e \"GRANT ALL PRIVILEGES ON dataCollection.* TO 'dataCollector'@'localhost';\""
 		+ "\n"
-		+ "\nwget http://" + serverName + ":" + port + "/DataCollectorServer/endpointSoftware/CybercraftDataCollectionConnector.war -O /var/lib/tomcat8/webapps/CybercraftDataCollectionConnector.war"
+		+ "\nwget http://" + serverName + ":" + port + "/DataCollectorServer/openDataCollection/endpointSoftware/CybercraftDataCollectionConnector.war -O /var/lib/tomcat8/webapps/CybercraftDataCollectionConnector.war"
 		+ "\n"
 		+ "\n# Copy jar to install dir" 
 		+ "\n" 
 		+ "\n#mv ./DataCollector.jar /opt/dataCollector/" 
-		+ "\nwget http://" + serverName + ":" + port + "/DataCollectorServer/endpointSoftware/DataCollector.jar -O /opt/dataCollector/DataCollector.jar" 
+		+ "\nwget http://" + serverName + ":" + port + "/DataCollectorServer/openDataCollection/endpointSoftware/DataCollector.jar -O /opt/dataCollector/DataCollector.jar" 
 		+ "\nchmod +777 /opt/dataCollector/DataCollector.jar" 
 		+ "\nchmod +x /opt/dataCollector/DataCollector.jar" 
 		+ "\n" 
@@ -139,8 +240,8 @@ public class InstallScriptServlet extends HttpServlet {
 		+ "\n#!/bin/bash" 
 		+ "\nwhile true;" 
 		+ "\ndo" 
-		+ "\nservice mysql start" 
-		+ "\nservice tomcat8 start"
+		//+ "\nservice mysql start" 
+		//+ "\nservice tomcat8 start"
 		+ "\npkill -f \"/usr/bin/java -jar -XX:+IgnoreUnrecognizedVMOptions /opt/dataCollector/DataCollector.jar\"" 
 		+ "\n/usr/bin/java -Xmx1536m -jar -XX:+IgnoreUnrecognizedVMOptions /opt/dataCollector/DataCollector.jar -user " + curEmail + " -server " + serverName + ":" + port + " -databasePassword " + mariaPassword + " -event RevEngECompetition >> /opt/dataCollector/log.log 2>&1" 
 		+ "\necho \"Got a crash: $(date)\" >> /opt/dataCollector/log.log" 
@@ -173,7 +274,7 @@ public class InstallScriptServlet extends HttpServlet {
 		+ "\nservice mysql start" 
 		+ "\nservice tomcat8 start"
 		+ "\n"
-		+ "\n/opt/dataCollector/DataCollectorStart.sh & disown" ;
+		+ "\n/opt/dataCollector/DataCollectorStart.sh & disown" ;*/
 		response.getWriter().append(output);
 	}
 

@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.imageio.ImageIO;
+import javax.servlet.ServletContext;
 import javax.servlet.http.Part;
 
 
@@ -39,6 +40,9 @@ public class DatabaseConnector
 	//private String userName, password, address;
 	//private String baseAddr="localhost";
 	String theName = "tigress_challenge";
+	
+	private ConcurrentHashMap databaseMap;
+	private TestingConnectionSource mySource;
 	/**
 	 * This is the driver to be used.  It is default a mySql driver, but can be set later.
 	 */
@@ -65,11 +69,9 @@ public class DatabaseConnector
 	 */
 	public DatabaseConnector(String name)
 	{
-		databaseName=name;
-		//address="jdbc:mysql://"+baseAddr+":3306/taylorwiley";
-		//userName="taylorwiley"; password="4UB89VGDYyAGwebG";
-		//System.err.println(tmp);
-		//myPool=DatabaseConnectionPool.getInstance(address, driver, userName, maxConnections, password);
+		databaseName = name;
+		databaseMap = DatabaseInformationManager.getInstance().getNext(databaseName);
+		mySource = new TestingConnectionSource((String)databaseMap.get("username"), (String)databaseMap.get("password"), (String)databaseMap.get("address"));
 	}
 	
 	/**
@@ -80,50 +82,24 @@ public class DatabaseConnector
 	public synchronized String connect() throws Exception
 	{
 		String myReturn="";
-		//connection=myPool.getConnection();
-		/*
-		try
-		{
-			Class.forName(driver);
-			connection=DriverManager.getConnection(address, userName, password);
-		}
-		catch(Exception e)
-		{
-			myReturn=e.toString();
-			throw e;
-		}
-		*/
+		
 		return myReturn;
 	}
-	public synchronized String getConnection()
+	public synchronized Connection getConnection()
 	{
 		if(verbose)
 		{
 			System.out.println("Getting a connection");
 		}
-		String myReturn="";
-		if(connection!=null)
-		{
-			myReturn="already have connection";
-			return myReturn;
-		}
-		ConcurrentHashMap tmp=DatabaseInformationManager.getInstance().getNext(databaseName);
-		if(verbose)
-		{
-			System.out.println("Got a connection pool");
-		}
-		//System.err.println(tmp);
-		if(tmp==null)
-		{
-			myReturn="no databases found";
-			return myReturn;
-		}
-		myPool=DatabaseConnectionPool.getInstance((String)tmp.get("address"), (String)tmp.get("driver"), (String)tmp.get("username"), (Integer)tmp.get("maxconnections"), (String)tmp.get("password"));
-		while(connection==null)
-		{
+		//String myReturn="";
+		return mySource.getDatabaseConnection();
+		//myPool=DatabaseConnectionPool.getInstance((String)tmp.get("address"), (String)tmp.get("driver"), (String)tmp.get("username"), (Integer)tmp.get("maxconnections"), (String)tmp.get("password"));
+		//while(connection==null)
+		//{
 			//System.out.println("Getting connection");
-			connection=myPool.getConnection();
-		}
+		//	connection=myPool.Connection connection = getConnection();
+		//}
+		
 		/*
 		try
 		{
@@ -136,16 +112,16 @@ public class DatabaseConnector
 			throw e;
 		}
 		*/
-		return myReturn;
+		//return myReturn;
 	}
-	public synchronized void disconnect()
+	public synchronized void disconnect(Connection myConnection)
 	{
-		if(connection==null)
-		{
-			return;
+		try {
+			myConnection.close();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
-		myPool.returnConnection(connection);
-		connection=null;
 	}
 	/**
 	 * 
@@ -153,7 +129,7 @@ public class DatabaseConnector
 	 */
 	public synchronized int getNumConnections()
 	{
-		return myPool.getNumConnections();
+		return 0;
 	}
 	/**
 	 * 
@@ -161,7 +137,7 @@ public class DatabaseConnector
 	 */
 	public synchronized int getNumConnectionsInPool()
 	{
-		return myPool.getNumConnectionsInPool();
+		return 0;
 	}
 	/**
 	 * 
@@ -169,7 +145,7 @@ public class DatabaseConnector
 	 */
 	public synchronized int getNumConnectionsCheckedOut()
 	{
-		return myPool.getNumConnectionsCheckedOut();
+		return 0;
 	}
 	/**
 	 * 
@@ -177,30 +153,13 @@ public class DatabaseConnector
 	 */
 	public synchronized String getErrors()
 	{
-		return myPool.errors;
+		return "";
 	}
 	/**
 	 * 
 	 */
 	public synchronized void finalize()
 	{
-		try {
-			connection.close();
-		} catch (SQLException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		connection=null;
-		/*
-		try
-		{
-			connection.close();
-		}
-		catch(SQLException e1)
-		{
-			e1.printStackTrace();
-		}
-		*/
 		try
 		{
 			super.finalize();
@@ -218,7 +177,7 @@ public class DatabaseConnector
 	public synchronized ArrayList getColumnNames(String table)
 	{
 		ArrayList myReturn=new ArrayList();
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			System.out.println(theName);
@@ -226,7 +185,7 @@ public class DatabaseConnector
 			PreparedStatement myStmt=connection.prepareStatement("SELECT `COLUMN_NAME` FROM `INFORMATION_SCHEMA`.`COLUMNS` WHERE  `TABLE_SCHEMA` = '"+theName+"' AND  `TABLE_NAME` =  ?");
 			myStmt.setString(1, table);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			while(myResults.next())
 			{
 				myReturn.add(myResults.getObject(1));
@@ -235,10 +194,10 @@ public class DatabaseConnector
 		catch(Exception e)
 		{
 			e.printStackTrace();
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -256,7 +215,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -269,7 +228,7 @@ public class DatabaseConnector
 			myStmt.setString(2, password);
 			myStmt.setString(3, username);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			if(myResults.next())
@@ -295,17 +254,18 @@ public class DatabaseConnector
 			}
 			else
 			{
-				disconnect();
+				disconnect(connection);
 				return null;
 			}
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			e.printStackTrace();
+			disconnect(connection);
 			return null;
 		}
 		User myReturn=new User(attributes, false, tables);
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -323,7 +283,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -334,7 +294,7 @@ public class DatabaseConnector
 			PreparedStatement myStmt=connection.prepareStatement("SELECT * FROM user INNER JOIN role ON user.email = role.email WHERE user.email = ?");
 			myStmt.setString(1, username);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			if(myResults.next())
@@ -360,17 +320,17 @@ public class DatabaseConnector
 			}
 			else
 			{
-				disconnect();
+				disconnect(connection);
 				return null;
 			}
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
 		User myReturn=new User(attributes, false, tables);
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -389,7 +349,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -400,7 +360,7 @@ public class DatabaseConnector
 			PreparedStatement myStmt=connection.prepareStatement("SELECT COUNT(*) AS 'count' FROM `auto_grade_tests_default` WHERE `challenge_name` = ?");
 			myStmt.setString(1, testname);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			if(myResults.next())
@@ -426,17 +386,17 @@ public class DatabaseConnector
 			}
 			else
 			{
-				disconnect();
+				disconnect(connection);
 				return null;
 			}
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
 		DBObj myReturn=new DBObj(attributes, false, tables);
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -453,7 +413,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -465,7 +425,7 @@ public class DatabaseConnector
 			PreparedStatement myStmt=connection.prepareStatement("SELECT * FROM challenge WHERE challenge.admin_email = ?");
 			myStmt.setString(1, username);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -495,10 +455,10 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -515,7 +475,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -527,7 +487,7 @@ public class DatabaseConnector
 			PreparedStatement myStmt=connection.prepareStatement("SELECT * FROM user INNER JOIN role ON user.email = role.email WHERE role.administrator = ? ORDER BY role.course");
 			myStmt.setString(1, username);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -557,10 +517,10 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -581,7 +541,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -618,7 +578,7 @@ public class DatabaseConnector
 			myStmt.setString(1, username);
 			//myStmt.setString(2, ordering);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -648,10 +608,10 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -670,7 +630,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -682,7 +642,7 @@ public class DatabaseConnector
 			PreparedStatement myStmt=connection.prepareStatement("SELECT * FROM challenge_participant INNER JOIN challenge ON challenge_participant.challenge_name = challenge.challenge_name LEFT JOIN challenge_participant_grades ON challenge_participant_grades.email = challenge_participant.email AND challenge_participant_grades.challenge_name = challenge_participant.challenge_name LEFT JOIN auto_grade_tests ON challenge_participant_grades.challenge_name = auto_grade_tests.challenge_name AND challenge_participant_grades.test_number = auto_grade_tests.test_number WHERE challenge_participant.email = ?");
 			myStmt.setString(1, username);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			int curJoin = 0;
@@ -762,10 +722,10 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -782,7 +742,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -795,7 +755,7 @@ public class DatabaseConnector
 			myStmt.setString(1, username);
 			myStmt.setString(2, challengeName);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -833,10 +793,10 @@ public class DatabaseConnector
 		{
 			if(verbose)
 				e.printStackTrace();
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -848,7 +808,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -861,7 +821,7 @@ public class DatabaseConnector
 			myStmt.setString(1, challengeName);
 			myStmt.setString(2, email);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -891,11 +851,11 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -912,7 +872,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -924,7 +884,7 @@ public class DatabaseConnector
 			PreparedStatement myStmt=connection.prepareStatement("SELECT * FROM challenge INNER JOIN auto_grade_tests ON challenge.challenge_name = auto_grade_tests.challenge_name INNER JOIN auto_grade_args ON auto_grade_tests.challenge_name = auto_grade_args.challenge_name AND auto_grade_tests.test_number = auto_grade_args.test_number WHERE challenge.challenge_name = ? ORDER BY auto_grade_tests.test_number ASC, auto_grade_args.arg_order ASC");
 			myStmt.setString(1, challengeName);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -954,11 +914,11 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -975,7 +935,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -988,7 +948,7 @@ public class DatabaseConnector
 			myStmt.setString(1, challengeName);
 			myStmt.setString(2, username);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -1018,11 +978,11 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -1040,7 +1000,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -1053,7 +1013,7 @@ public class DatabaseConnector
 			myStmt.setString(1, challengeName);
 			myStmt.setInt(2, testNumber);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -1083,11 +1043,11 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -1099,7 +1059,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -1112,7 +1072,7 @@ public class DatabaseConnector
 			myStmt.setString(1, challengeName);
 			myStmt.setString(2, email);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -1147,11 +1107,11 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -1169,7 +1129,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -1182,7 +1142,7 @@ public class DatabaseConnector
 			myStmt.setString(1, challengeName);
 			myStmt.setString(2, email);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -1212,11 +1172,11 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -1228,7 +1188,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -1244,7 +1204,7 @@ public class DatabaseConnector
 				System.out.println(myStmt);
 			}
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -1284,11 +1244,11 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -1300,7 +1260,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -1312,7 +1272,7 @@ public class DatabaseConnector
 			PreparedStatement myStmt=connection.prepareStatement("SELECT * FROM challenge_default INNER JOIN challenge_command_default ON challenge_default.challenge_name = challenge_command_default.challenge_name AND challenge_default.administrator = challenge_command_default.administrator WHERE challenge_default.administrator = '' OR challenge_default.administrator = ? ORDER BY challenge_default.administrator ASC, challenge_command_default.command_order ASC");
 			myStmt.setString(1, username);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -1351,10 +1311,10 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -1366,7 +1326,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -1379,7 +1339,7 @@ public class DatabaseConnector
 			myStmt.setString(1, username);
 			myStmt.setString(2, challengeName);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -1417,10 +1377,10 @@ public class DatabaseConnector
 			{
 				e.printStackTrace();
 			}
-			//disconnect();
+			//disconnect(connection);
 			return null;
 		}
-		//disconnect();
+		//disconnect(connection);
 		return myReturn;
 	}
 	
@@ -1432,7 +1392,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -1444,7 +1404,7 @@ public class DatabaseConnector
 			PreparedStatement myStmt=connection.prepareStatement("SELECT * FROM challenge_default INNER JOIN challenge_command_default ON challenge_default.challenge_name = challenge_command_default.challenge_name WHERE challenge_default.challenge_name = ? ORDER BY challenge_command_default.command_order ASC");
 			myStmt.setString(1, challengeName);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -1478,10 +1438,10 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
 	}
 	
@@ -1493,7 +1453,7 @@ public class DatabaseConnector
 		}
 		ArrayList tables=new ArrayList();
 		tables.add("user");
-		System.out.println(getConnection());
+		Connection connection = getConnection();
 		if(verbose)
 		{
 			System.out.println("Connector got connection");
@@ -1506,7 +1466,7 @@ public class DatabaseConnector
 			myStmt.setString(1, challengeName);
 			myStmt.setString(2, email);
 			ResultSet myResults=myStmt.executeQuery();
-			//disconnect();
+			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			while(myResults.next())
@@ -1536,16 +1496,40 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
-		disconnect();
+		disconnect(connection);
 		return myReturn;
+	}
+	
+	public synchronized void syncChallenges(String admin, User myUser, ServletContext sc)
+	{
+		ArrayList allChallenges = getAdminChallenges(admin);
+		ArrayList assigned = (ArrayList)getChallenges((String) myUser.getAttribute("email"));
+		ArrayList challengeNames = new ArrayList();
+		for(int x=0; x<assigned.size(); x++)
+		{
+			DBObj curObj = (DBObj)assigned.get(x);
+			String curName = (String)curObj.getAttribute("challenge_name");
+			challengeNames.add(curName);
+		}
+		for(int x=0; x<allChallenges.size(); x++)
+		{
+			DBObj curObj = (DBObj)allChallenges.get(x);
+			String curName = (String)curObj.getAttribute("challenge_name");
+			if(!assigned.contains(curName))
+			{
+				assignChallenge(curName, (String) myUser.getAttribute("email"));
+				CodeGeneratorPool curPool = CodeGeneratorPool.getInstance();
+	        	curPool.insertGeneration(this, myUser, sc, curName);
+			}
+		}
 	}
 	
 	public void assignChallenge(String challengeName, String email)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `challenge_participant`(`challenge_name`, `email`) VALUES (?,?)");
@@ -1555,15 +1539,15 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public void unassignChallenge(String challengeName, String email)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("DELETE FROM `challenge_participant` WHERE `challenge_name`=? AND `email`=?");
@@ -1573,15 +1557,15 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public void removeChallengeParticipantTests(String challengeName, String email)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("DELETE FROM `challenge_participant_grades` WHERE `challenge_name`=? AND `email`=?");
@@ -1591,16 +1575,16 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	
 	public User dataCollectEnable(String email)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("UPDATE `user` SET `downloadedDataCollection` = '1' WHERE `user`.`email` = ?");
@@ -1609,17 +1593,17 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return getUser(email);
 		}
-		disconnect();
+		disconnect(connection);
 		return getUser(email);
 	}
 	
 	public boolean updateChallenge(String prevName, String newName, String openTime, String endTime, String description, boolean randomSeed, String seed)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("UPDATE `challenge` SET `challenge_name`=?,`open_time`=?,`end_time`=?,`description`=?, `randomSeed`=?, `seed`=? WHERE `challenge_name`=?");
@@ -1634,17 +1618,17 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return false;
 		}
-		disconnect();
+		disconnect(connection);
 		return true;
 	}
 	
 	public boolean updateChallenge(String prevName, String newName, String openTime, String endTime, String description, boolean autoGrade, boolean randomSeed, String seed)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("UPDATE `challenge` SET `challenge_name`=?,`open_time`=?,`end_time`=?,`description`=?,`auto_grade`=?, `randomSeed`=?, `seed`=? WHERE `challenge_name`=?");
@@ -1660,17 +1644,17 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return false;
 		}
-		disconnect();
+		disconnect(connection);
 		return true;
 	}
 	
 	public boolean updateChallengeDefault(String prevName, String newName, String description)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("UPDATE `challenge_default` SET `challenge_name`=?,`description`=? WHERE `challenge_name`=?");
@@ -1681,17 +1665,17 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return false;
 		}
-		disconnect();
+		disconnect(connection);
 		return true;
 	}
 	
 	public boolean updateChallengeDefault(String prevName, String newName, String description, boolean autoGrade)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("UPDATE `challenge_default` SET `challenge_name`=?,`description`=?,`auto_grade`=? WHERE `challenge_name`=?");
@@ -1703,17 +1687,17 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return false;
 		}
-		disconnect();
+		disconnect(connection);
 		return true;
 	}
 	
 	public boolean setGrade(String challenge, String email, String grade)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("UPDATE `challenge_participant` SET `grade`=? WHERE `challenge_name`=? AND `email`=?");
@@ -1724,17 +1708,17 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return false;
 		}
-		disconnect();
+		disconnect(connection);
 		return true;
 	}
 	
 	public boolean createChallenge(String newName, String openTime, String endTime, String description, String email, String type, boolean randomSeed, String seed)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `challenge`(`challenge_name`, `open_time`, `end_time`, `description`, `admin_email`, `type`, `randomSeed`, `seed`) VALUES (?,?,?,?,?,?,?,?)");
@@ -1751,18 +1735,18 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return false;
 		}
-		disconnect();
+		disconnect(connection);
 		assignChallenge(newName, email);
 		return true;
 	}
 	
 	public boolean createChallenge(String newName, String openTime, String endTime, String description, String email, String type, boolean autoGrade, boolean randomSeed, String seed)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `challenge`(`challenge_name`, `open_time`, `end_time`, `description`, `admin_email`, `type`, `auto_grade`, `randomSeed`, `seed`) VALUES (?,?,?,?,?,?,?,?,?)");
@@ -1780,18 +1764,18 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return false;
 		}
-		disconnect();
+		disconnect(connection);
 		assignChallenge(newName, email);
 		return true;
 	}
 	
 	public boolean createChallengeDefault(String newName, String description, String email)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `challenge_default`(`challenge_name`, `description`, `administrator`) VALUES (?,?,?)");
@@ -1806,18 +1790,18 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return false;
 		}
-		disconnect();
+		disconnect(connection);
 		//assignChallenge(newName, email);
 		return true;
 	}
 	
 	public boolean createChallengeDefault(String newName, String description, String email, boolean autoGrade)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `challenge_default`(`challenge_name`, `description`, `administrator`, `auto_grade`) VALUES (?,?,?,?)");
@@ -1833,18 +1817,18 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 			return false;
 		}
-		disconnect();
+		disconnect(connection);
 		//assignChallenge(newName, email);
 		return true;
 	}
 	
 	public void deleteCommands(String prevChallengeName)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("DELETE FROM `challenge_command` WHERE `challenge_name` = ?");
@@ -1853,15 +1837,15 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public void deleteCommandsDefault(String prevChallengeName, String administrator)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("DELETE FROM `challenge_command_default` WHERE `challenge_name` = ? AND `administrator` = ?");
@@ -1871,15 +1855,15 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public void deleteTestsDefault(String prevChallengeName, String administrator)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("DELETE FROM `auto_grade_tests_default` WHERE `challenge_name` = ? AND `administrator` = ?");
@@ -1889,15 +1873,15 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public void deleteTests(String prevChallengeName)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("DELETE FROM `auto_grade_tests` WHERE `challenge_name` = ?");
@@ -1906,15 +1890,15 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public void deleteChallenge(String prevChallengeName, String email)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("DELETE FROM `challenge` WHERE `challenge_name` = ? AND `admin_email` = ?");
@@ -1925,15 +1909,15 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public void addCommand(String commandOrder, String commandName, String command, String challengeName)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `challenge_command`(`command_order`, `commandName`, `command`, `challenge_name`) VALUES (?, ?, ?, ?)");
@@ -1945,15 +1929,15 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public void addCommandDefault(String commandOrder, String commandName, String command, String challengeName, String email)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `challenge_command_default`(`command_order`, `commandName`, `command`, `challenge_name`, `administrator`) VALUES (?, ?, ?, ?, ?)");
@@ -1966,15 +1950,15 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public void addGradeDefault(String challengeName, int testNum, String numIterations, String performance, String email)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `auto_grade_tests_default`(`challenge_name`, `test_number`, `num_iterations`, `performance_multiplier`, `administrator`) VALUES (?,?,?,?,?)");
@@ -1987,16 +1971,16 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	
 	public void addGradeTest(String challengeName, int testNum, String numIterations, String performance)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `auto_grade_tests`(`challenge_name`, `test_number`, `num_iterations`, `performance_multiplier`) VALUES (?,?,?,?)");
@@ -2008,16 +1992,16 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	
 	public void addGradeDefaultArg(String challengeName, int testNum, int argNum, String argType, String argVal, String email)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `auto_grade_args_default`(`challenge_name`, `test_number`, `arg_order`, `arg_type`, `arg_value`, `administrator`) VALUES (?,?,?,?,?,?)");
@@ -2031,15 +2015,15 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public void addGradeTestArg(String challengeName, int testNum, int argNum, String argType, String argVal)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `auto_grade_args`(`challenge_name`, `test_number`, `arg_order`, `arg_type`, `arg_value`) VALUES (?,?,?,?,?)");
@@ -2052,15 +2036,15 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public void addGradeDefaultArg(String challengeName, int testNum, int argNum, String argType, String email)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `auto_grade_args_default`(`challenge_name`, `test_number`, `arg_order`, `arg_type`, `arg_value`, `administrator`) VALUES (?,?,?,?,NULL,?)");
@@ -2073,15 +2057,15 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public void addGradeTestArg(String challengeName, int testNum, int argNum, String argType)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("INSERT INTO `auto_grade_args`(`challenge_name`, `test_number`, `arg_order`, `arg_type`, `arg_value`) VALUES (?,?,?,?,NULL)");
@@ -2093,16 +2077,16 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	
 	public void deleteUser(String email)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("DELETE FROM `user` WHERE `email`=?");
@@ -2111,10 +2095,10 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	/**
@@ -2133,7 +2117,7 @@ public class DatabaseConnector
 		{
 			System.out.println("Getting column names");
 		}
-		getConnection();
+		Connection connection = getConnection();
 		ArrayList validColumns=getColumnNames("user");
 		Iterator myIter=updateMap.keySet().iterator();
 		String stmt="UPDATE user SET ";
@@ -2332,13 +2316,14 @@ public class DatabaseConnector
 		}
 		if(!updatepermission)
 		{
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
 		*/
 		try
 		{
-			getConnection();
+			disconnect(connection);
+			connection = getConnection();
 			PreparedStatement myStmt=connection.prepareStatement(stmt);
 			for(int x=0; x<parameters.size(); x++)
 			{
@@ -2350,11 +2335,11 @@ public class DatabaseConnector
 		catch(Exception e)
 		{
 			e.printStackTrace();
-			disconnect();
+			disconnect(connection);
 			return null;
 		}
 		toUpdate.setWritten(true);
-		disconnect();
+		disconnect(connection);
 		return getUser((String)toUpdate.getAttribute("email"));
 	}
 	
@@ -2367,7 +2352,7 @@ public class DatabaseConnector
 		String stmt="UPDATE `challenge_participant` SET `code_generated` = '1', `originalFile` = ?,  `gradingFile` = ?, `obfuscatedFile` = ?, `codeGeneratedTime` = CURRENT_TIMESTAMP, `participantSeed` = ? WHERE `challenge_participant`.`challenge_name` = ? AND `challenge_participant`.`email` = ?";
 		try
 		{
-			getConnection();
+			Connection connection = getConnection();
 			PreparedStatement myStmt=connection.prepareStatement(stmt);
 			myStmt.setBytes(1, originalFile);
 			myStmt.setBytes(2, gradingFile);
@@ -2381,10 +2366,10 @@ public class DatabaseConnector
 		catch(Exception e)
 		{
 			e.printStackTrace();
-			disconnect();
+			disconnect(connection);
 			return;
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	/**
@@ -2399,7 +2384,7 @@ public class DatabaseConnector
 		String stmt="UPDATE `challenge` SET `cachedOriginal` = ?,  `cachedGrading` = ?, `cachedObfuscated` = ? WHERE `challenge`.`challenge_name` = ?";
 		try
 		{
-			getConnection();
+			Connection connection = getConnection();
 			PreparedStatement myStmt=connection.prepareStatement(stmt);
 			myStmt.setBytes(1, originalFile);
 			myStmt.setBytes(2, gradingFile);
@@ -2411,10 +2396,10 @@ public class DatabaseConnector
 		catch(Exception e)
 		{
 			e.printStackTrace();
-			disconnect();
+			disconnect(connection);
 			return;
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	/**
@@ -2426,7 +2411,7 @@ public class DatabaseConnector
 		String stmt="UPDATE `challenge_participant` SET `submittedFile` = ?, `submittedWrittenFile` = ?, `submissionTime` = CURRENT_TIME() WHERE `challenge_participant`.`challenge_name` = ? AND `challenge_participant`.`email` = ?";
 		try
 		{
-			getConnection();
+			Connection connection = getConnection();
 			PreparedStatement myStmt=connection.prepareStatement(stmt);
 			myStmt.setBytes(1, codeFile);
 			myStmt.setBytes(2, writeFile);
@@ -2438,16 +2423,16 @@ public class DatabaseConnector
 		catch(Exception e)
 		{
 			e.printStackTrace();
-			disconnect();
+			disconnect(connection);
 			return;
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	
 	public synchronized void gradeChallengeParticipant(String challengeName, String email, int testNumber, int score, boolean correct, boolean performance, boolean inProgress)
 	{
-		getConnection();
+		Connection connection = getConnection();
 		try
 		{
 			PreparedStatement myStmt = connection.prepareStatement("REPLACE INTO `challenge_participant_grades`(`challenge_name`, `email`, `test_number`, `iterations_passed`, `correct`, `performance`, `in_progress`) VALUES (?,?,?,?,?,?,?)");
@@ -2462,10 +2447,10 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			e.printStackTrace();
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public synchronized void writeUserRequest(String userName, String email, String fname, String mname, String lname, String pass, String message, String type) throws Exception
@@ -2477,7 +2462,7 @@ public class DatabaseConnector
 		
 		try
 		{
-			getConnection();
+			Connection connection = getConnection();
 			PreparedStatement myStmt=connection.prepareStatement(stmt);
 			myStmt.setString(1, userName);
 			myStmt.setString(2, email);
@@ -2496,12 +2481,12 @@ public class DatabaseConnector
 		}
 		catch(Exception e)
 		{
-			disconnect();
+			disconnect(connection);
 			throw e;
 			//e.printStackTrace();
 			//return;
 		}
-		disconnect();
+		disconnect(connection);
 	}
 	
 	public synchronized void writeCsvUsers(UserCsvParser myParser)
@@ -2516,7 +2501,7 @@ public class DatabaseConnector
 			String stmt4="INSERT INTO `challenge_participant` (`email`, `challenge_name`) VALUES (?, 'Assignment 1 B')";
 			try
 			{
-				getConnection();
+				Connection connection = getConnection();
 				PreparedStatement myStmt=connection.prepareStatement(stmt);
 				myStmt.setString(1, (String) tmp.get("email"));
 				myStmt.setString(2, (String) tmp.get("email"));
@@ -2552,10 +2537,10 @@ public class DatabaseConnector
 			catch(Exception e)
 			{
 				e.printStackTrace();
-				disconnect();
+				disconnect(connection);
 				//return;
 			}
-			disconnect();
+			disconnect(connection);
 		}
 	}
 	
@@ -2571,7 +2556,7 @@ public class DatabaseConnector
 			String stmt4="INSERT INTO `challenge_participant` (`email`, `challenge_name`) VALUES (?, 'Assignment 1 B')";
 			try
 			{
-				getConnection();
+				Connection connection = getConnection();
 				PreparedStatement myStmt=connection.prepareStatement(stmt);
 				myStmt.setString(1, (String) tmp.get("email"));
 				myStmt.setString(2, (String) tmp.get("email"));
@@ -2607,10 +2592,10 @@ public class DatabaseConnector
 			catch(Exception e)
 			{
 				e.printStackTrace();
-				disconnect();
+				disconnect(connection);
 				//return;
 			}
-			disconnect();
+			disconnect(connection);
 		}
 	}
 	
@@ -2623,7 +2608,7 @@ public class DatabaseConnector
 		String stmt2="INSERT INTO `role` (`email`, `role`, `administrator`, `course`) VALUES (?, ?, ?, ?)";
 		try
 		{
-			getConnection();
+			Connection connection = getConnection();
 			PreparedStatement myStmt=connection.prepareStatement(stmt);
 			myStmt.setString(1, username);
 			myStmt.setString(2, email);
@@ -2650,9 +2635,9 @@ public class DatabaseConnector
 		catch(Exception e)
 		{
 			e.printStackTrace();
-			disconnect();
+			disconnect(connection);
 			//return;
 		}
-		disconnect();
+		disconnect(connection);
 	}
 }

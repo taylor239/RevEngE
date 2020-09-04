@@ -60,16 +60,40 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 		{
 			return;
 		}
+		
+		DatabaseInformationManager manager=DatabaseInformationManager.getInstance();
+		ServletContext sc=getServletContext();
+		String reportPath=sc.getRealPath("/WEB-INF/");
+		reportPath+="/databases.xml";
+		manager.addInfoFile(reportPath);
 		DatabaseConnector myConnector=(DatabaseConnector)session.getAttribute("connector");
 		if(myConnector==null)
 		{
 			myConnector=new DatabaseConnector("pillar");
+			try {
+				myConnector.connect();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			session.setAttribute("connector", myConnector);
 		}
-		User myUser=(User)session.getAttribute("user");
+		
+		User myUser = null;
+		System.out.println("Looking for user params");
+		if(request.getParameter("email")!=null && request.getParameter("password")!=null)
+		{
+			System.out.println("Attempting sign in " + request.getParameter("email"));
+			myUser=myConnector.signIn(request.getParameter("email"), request.getParameter("password"), request.getRemoteAddr());
+			session.setAttribute("user", myUser);
+		}
+		
+		myUser=(User)session.getAttribute("user");
 		
 		
 		String challengeName = (request.getParameter("challengeName"));
+		
+		String redirectTo = (request.getParameter("redirect"));
 		
 		String uploadData = "no";
 		if(request.getParameterMap().containsKey("uploadData"))
@@ -128,7 +152,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 			ArrayList gradeChallenge = myConnector.getChallengeAutoGrade(challengeName);
 			//System.out.println(((DBObj)gradeChallenge.get(0)).getAttributes());
 			ServerManager nativeInterface = ServerManager.getInstance();
-			ServletContext sc=getServletContext();
+			//ServletContext sc=getServletContext();
 			try
 			{
 				byte[] challengeMD5Bytes=challengeName.getBytes();
@@ -186,174 +210,216 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	        	}
 	        	if((byte[])((DBObj)curChallenge.get(0)).getAttribute("gradingFile") != null && ((byte[])((DBObj)curChallenge.get(0)).getAttribute("gradingFile")).length > 0)
 	        	{
-	        		new File(genDir + "/grading.c").delete();
 	        		FileUtils.writeByteArrayToFile(new File(genDir + "/grading.c"), (byte[])((DBObj)curChallenge.get(0)).getAttribute("gradingFile"));
 	        	}
 	        	else
 	        	{
-	        		new File(genDir + "/grading.c").delete();
 	        		FileUtils.writeByteArrayToFile(new File(genDir + "/grading.c"), (byte[])((DBObj)curChallenge.get(0)).getAttribute("originalFile"));
 	        	}
-	        	new File(genDir + "/submitted.c").delete();
-	        	FileUtils.writeByteArrayToFile(new File(genDir + "/submitted.c"), (byte[])((DBObj)curChallenge.get(0)).getAttribute("submittedFile"));
+	        	if(((DBObj)curChallenge.get(0)).getAttribute("submittedFile") instanceof String)
+	        	{
+	        		FileUtils.writeStringToFile(new File(genDir + "/submitted.c"), (String)((DBObj)curChallenge.get(0)).getAttribute("submittedFile"));
+	        	}
+	        	else
+	        	{
+	        		FileUtils.writeByteArrayToFile(new File(genDir + "/submitted.c"), (byte[])((DBObj)curChallenge.get(0)).getAttribute("submittedFile"));
+	        	}
 	        	
+	        	boolean isCompiledSubmission = false;
+	        	
+	        	System.out.println(((DBObj)curChallenge.get(0)).getAttributeNames());
+	        	
+	        	if(((int)((DBObj)curChallenge.get(0)).getAttribute("is_compiled")) == 1)
+	        	{
+	        		isCompiledSubmission = true;
+	        		if(((DBObj)curChallenge.get(0)).getAttribute("submittedFile") instanceof String)
+		        	{
+	        			File genFile = new File(genDir + "/submitted.out");
+	        			genFile.setExecutable(true, true);
+		        		FileUtils.writeStringToFile(genFile, (String)((DBObj)curChallenge.get(0)).getAttribute("submittedFile"));
+		        	}
+		        	else
+		        	{
+		        		File genFile = new File(genDir + "/submitted.out");
+		        		genFile.setExecutable(true, true);
+		        		FileUtils.writeByteArrayToFile(genFile, (byte[])((DBObj)curChallenge.get(0)).getAttribute("submittedFile"));
+		        	}
+	        	}
 	        	
 	        	
 	        	String[] compileCmdArray;// = new String[3];
 	        	
-	        	//clang-5.0 -emit-llvm -c -o sample.bc sample.c
-	        	compileCmdArray = new String[6];
-	        	compileCmdArray[0] = "clang-5.0";
-	        	compileCmdArray[1] = "-emit-llvm";
-	        	compileCmdArray[2] = "-c";
-	        	compileCmdArray[3] = "-o";
-	        	compileCmdArray[4] = genDir + "/grading.bc";
-	        	compileCmdArray[5] = genDir + "/grading.c";
-	        	String nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
-	        	System.out.println(tmpFile.getAbsolutePath());
-	        	System.out.println(nativeOutput);
 	        	
-	        	//opt-5.0 -load ../passes/llvm-pass-countloads/build/countloads/libCountLoadsPass.so -countloads sample.bc -o sample_count.bc
-	        	compileCmdArray = new String[7];
-	        	compileCmdArray[0] = "opt-5.0";
-	        	compileCmdArray[1] = "-load";
-	        	compileCmdArray[2] = genDir + "/../../../local_bin/performanceCounter/build/countloads/libCountLoadsPass.so";
-	        	compileCmdArray[3] = "-countloads";
-	        	compileCmdArray[4] = genDir + "/grading.bc";
-	        	compileCmdArray[5] = "-o";
-	        	compileCmdArray[6] = genDir + "/grading_count.bc";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, genDir, environmentalVars);
-	        	System.out.println(genDir.getAbsolutePath());
-	        	System.out.println(nativeOutput);
-	        	
-	        	//clang-5.0 -emit-llvm -O3 -c -o exithandler.bc exithandler.c
-	        	compileCmdArray[0] = "clang-5.0";
-	        	compileCmdArray[1] = "-emit-llvm";
-	        	compileCmdArray[2] = "-O3";
-	        	compileCmdArray[3] = "-c";
-	        	compileCmdArray[4] = "-o";
-	        	compileCmdArray[5] = genDir + "/exithandler.bc";
-	        	compileCmdArray[6] = genDir + "/exithandler.c";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
-	        	System.out.println(tmpFile.getAbsolutePath());
-	        	System.out.println(nativeOutput);
-	        	
-	        	//llvm-link-5.0 exithandler.bc sample_count.bc -o sample_linked.bc
-	        	compileCmdArray = new String[5];
-	        	compileCmdArray[0] = "llvm-link-5.0";
-	        	compileCmdArray[1] = genDir + "/exithandler.bc";
-	        	compileCmdArray[2] = genDir + "/grading_count.bc";
-	        	compileCmdArray[3] = "-o";
-	        	compileCmdArray[4] = genDir + "/grading_count_linked.bc";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
-	        	System.out.println(tmpFile.getAbsolutePath());
-	        	System.out.println(nativeOutput);
-	        	
-	        	//llc-5.0 sample_linked.bc
-	        	compileCmdArray = new String[2];
-	        	compileCmdArray[0] = "llc-5.0";
-	        	compileCmdArray[1] = genDir + "/grading_count_linked.bc";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
-	        	System.out.println(tmpFile.getAbsolutePath());
-	        	System.out.println(nativeOutput);
-	        	
-	        	//g++ -O3 sample_linked.s -o sample_linked.out
-	        	compileCmdArray = new String[5];
-	        	compileCmdArray[0] = "g++";
-	        	compileCmdArray[1] = "-O3";
-	        	compileCmdArray[2] = genDir + "/grading_count_linked.s";
-	        	compileCmdArray[3] = "-o";
-	        	compileCmdArray[4] = genDir + "/grading.out";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
-	        	System.out.println(tmpFile.getAbsolutePath());
-	        	System.out.println(nativeOutput);
-	        	
-	        	/*
-	        	compileCmdArray = new String[3];
-	        	compileCmdArray[0] = "gcc";
-	        	compileCmdArray[1] = genDir + "/grading.c";
-	        	compileCmdArray[2] = "-o"+genDir+"/grading.out";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
-	        	System.out.println(tmpFile.getAbsolutePath());
-	        	System.out.println(compileCmdArray[2]);
-	        	System.out.println(nativeOutput);
-	        	*/
-	        	
-	        	//clang-5.0 -emit-llvm -c -o sample.bc sample.c
-	        	compileCmdArray = new String[6];
-	        	compileCmdArray[0] = "clang-5.0";
-	        	compileCmdArray[1] = "-emit-llvm";
-	        	compileCmdArray[2] = "-c";
-	        	compileCmdArray[3] = "-o";
-	        	compileCmdArray[4] = genDir + "/submitted.bc";
-	        	compileCmdArray[5] = genDir + "/submitted.c";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
-	        	System.out.println(tmpFile.getAbsolutePath());
-	        	System.out.println(nativeOutput);
-	        	
-	        	//opt-5.0 -load ../passes/llvm-pass-countloads/build/countloads/libCountLoadsPass.so -countloads sample.bc -o sample_count.bc
-	        	compileCmdArray = new String[7];
-	        	compileCmdArray[0] = "opt-5.0";
-	        	compileCmdArray[1] = "-load";
-	        	compileCmdArray[2] = genDir + "/../../../local_bin/performanceCounter/build/countloads/libCountLoadsPass.so";
-	        	compileCmdArray[3] = "-countloads";
-	        	compileCmdArray[4] = genDir + "/submitted.bc";
-	        	compileCmdArray[5] = "-o";
-	        	compileCmdArray[6] = genDir + "/submitted_count.bc";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, genDir, environmentalVars);
-	        	System.out.println(genDir.getAbsolutePath());
-	        	System.out.println(nativeOutput);
-	        	
-	        	//clang-5.0 -emit-llvm -O3 -c -o exithandler.bc exithandler.c
-	        	compileCmdArray[0] = "clang-5.0";
-	        	compileCmdArray[1] = "-emit-llvm";
-	        	compileCmdArray[2] = "-O3";
-	        	compileCmdArray[3] = "-c";
-	        	compileCmdArray[4] = "-o";
-	        	compileCmdArray[5] = genDir + "/exithandler.bc";
-	        	compileCmdArray[6] = genDir + "/exithandler.c";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
-	        	System.out.println(tmpFile.getAbsolutePath());
-	        	System.out.println(nativeOutput);
-	        	
-	        	//llvm-link-5.0 exithandler.bc sample_count.bc -o sample_linked.bc
-	        	compileCmdArray = new String[5];
-	        	compileCmdArray[0] = "llvm-link-5.0";
-	        	compileCmdArray[1] = genDir + "/exithandler.bc";
-	        	compileCmdArray[2] = genDir + "/submitted_count.bc";
-	        	compileCmdArray[3] = "-o";
-	        	compileCmdArray[4] = genDir + "/submitted_count_linked.bc";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
-	        	System.out.println(tmpFile.getAbsolutePath());
-	        	System.out.println(nativeOutput);
-	        	
-	        	//llc-5.0 sample_linked.bc
-	        	compileCmdArray = new String[2];
-	        	compileCmdArray[0] = "llc-5.0";
-	        	compileCmdArray[1] = genDir + "/submitted_count_linked.bc";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
-	        	System.out.println(tmpFile.getAbsolutePath());
-	        	System.out.println(nativeOutput);
-	        	
-	        	//g++ sample_linked.s -o sample_linked.out
-	        	compileCmdArray = new String[5];
-	        	compileCmdArray[0] = "g++";
-	        	compileCmdArray[1] = "-O3";
-	        	compileCmdArray[2] = genDir + "/submitted_count_linked.s";
-	        	compileCmdArray[3] = "-o";
-	        	compileCmdArray[4] = genDir + "/submitted.out";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
-	        	System.out.println(tmpFile.getAbsolutePath());
-	        	System.out.println(nativeOutput);
-	        	
-	        	/*
-	        	compileCmdArray = new String[3];
-	        	compileCmdArray[0] = "gcc";
-	        	compileCmdArray[1] = genDir + "/submitted.c";
-	        	compileCmdArray[2] = "-o"+genDir+"/submitted.out";
-	        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
-	        	System.out.println(nativeOutput);
-	        	*/
+	        	if(!isCompiledSubmission)
+	        	{
+		        	//clang-5.0 -emit-llvm -c -o sample.bc sample.c
+		        	compileCmdArray = new String[6];
+		        	compileCmdArray[0] = "clang-5.0";
+		        	compileCmdArray[1] = "-emit-llvm";
+		        	compileCmdArray[2] = "-c";
+		        	compileCmdArray[3] = "-o";
+		        	compileCmdArray[4] = genDir + "/grading.bc";
+		        	compileCmdArray[5] = genDir + "/grading.c";
+		        	String nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(tmpFile.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+		        	//opt-5.0 -load ../passes/llvm-pass-countloads/build/countloads/libCountLoadsPass.so -countloads sample.bc -o sample_count.bc
+		        	compileCmdArray = new String[7];
+		        	compileCmdArray[0] = "opt-5.0";
+		        	compileCmdArray[1] = "-load";
+		        	compileCmdArray[2] = genDir + "/../../../local_bin/performanceCounter/build/countloads/libCountLoadsPass.so";
+		        	compileCmdArray[3] = "-countloads";
+		        	compileCmdArray[4] = genDir + "/grading.bc";
+		        	compileCmdArray[5] = "-o";
+		        	compileCmdArray[6] = genDir + "/grading_count.bc";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, genDir, environmentalVars);
+		        	System.out.println(genDir.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+		        	//clang-5.0 -emit-llvm -O3 -c -o exithandler.bc exithandler.c
+		        	compileCmdArray[0] = "clang-5.0";
+		        	compileCmdArray[1] = "-emit-llvm";
+		        	compileCmdArray[2] = "-O3";
+		        	compileCmdArray[3] = "-c";
+		        	compileCmdArray[4] = "-o";
+		        	compileCmdArray[5] = genDir + "/exithandler.bc";
+		        	compileCmdArray[6] = genDir + "/exithandler.c";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(tmpFile.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+		        	//llvm-link-5.0 exithandler.bc sample_count.bc -o sample_linked.bc
+		        	compileCmdArray = new String[5];
+		        	compileCmdArray[0] = "llvm-link-5.0";
+		        	compileCmdArray[1] = genDir + "/exithandler.bc";
+		        	compileCmdArray[2] = genDir + "/grading_count.bc";
+		        	compileCmdArray[3] = "-o";
+		        	compileCmdArray[4] = genDir + "/grading_count_linked.bc";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(tmpFile.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+		        	//llc-5.0 sample_linked.bc
+		        	compileCmdArray = new String[2];
+		        	compileCmdArray[0] = "llc-5.0";
+		        	compileCmdArray[1] = genDir + "/grading_count_linked.bc";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(tmpFile.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+		        	//clang-5.0 -O3 sample_linked.s -o sample_linked.out
+		        	compileCmdArray = new String[5];
+		        	compileCmdArray[0] = "clang-5.0";
+		        	compileCmdArray[1] = "-O3";
+		        	compileCmdArray[2] = genDir + "/grading_count_linked.s";
+		        	compileCmdArray[3] = "-o";
+		        	compileCmdArray[4] = genDir + "/grading.out";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(tmpFile.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+		        	/*
+		        	compileCmdArray = new String[3];
+		        	compileCmdArray[0] = "gcc";
+		        	compileCmdArray[1] = genDir + "/grading.c";
+		        	compileCmdArray[2] = "-o"+genDir+"/grading.out";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(tmpFile.getAbsolutePath());
+		        	System.out.println(compileCmdArray[2]);
+		        	System.out.println(nativeOutput);
+		        	*/
+		        	
+		        	//clang-5.0 -emit-llvm -c -o sample.bc sample.c
+		        	compileCmdArray = new String[6];
+		        	compileCmdArray[0] = "clang-5.0";
+		        	compileCmdArray[1] = "-emit-llvm";
+		        	compileCmdArray[2] = "-c";
+		        	compileCmdArray[3] = "-o";
+		        	compileCmdArray[4] = genDir + "/submitted.bc";
+		        	compileCmdArray[5] = genDir + "/submitted.c";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(tmpFile.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+		        	//opt-5.0 -load ../passes/llvm-pass-countloads/build/countloads/libCountLoadsPass.so -countloads sample.bc -o sample_count.bc
+		        	compileCmdArray = new String[7];
+		        	compileCmdArray[0] = "opt-5.0";
+		        	compileCmdArray[1] = "-load";
+		        	compileCmdArray[2] = genDir + "/../../../local_bin/performanceCounter/build/countloads/libCountLoadsPass.so";
+		        	compileCmdArray[3] = "-countloads";
+		        	compileCmdArray[4] = genDir + "/submitted.bc";
+		        	compileCmdArray[5] = "-o";
+		        	compileCmdArray[6] = genDir + "/submitted_count.bc";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, genDir, environmentalVars);
+		        	System.out.println(genDir.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+		        	//clang-5.0 -emit-llvm -O3 -c -o exithandler.bc exithandler.c
+		        	compileCmdArray[0] = "clang-5.0";
+		        	compileCmdArray[1] = "-emit-llvm";
+		        	compileCmdArray[2] = "-O3";
+		        	compileCmdArray[3] = "-c";
+		        	compileCmdArray[4] = "-o";
+		        	compileCmdArray[5] = genDir + "/exithandler.bc";
+		        	compileCmdArray[6] = genDir + "/exithandler.c";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(tmpFile.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+		        	//llvm-link-5.0 exithandler.bc sample_count.bc -o sample_linked.bc
+		        	compileCmdArray = new String[5];
+		        	compileCmdArray[0] = "llvm-link-5.0";
+		        	compileCmdArray[1] = genDir + "/exithandler.bc";
+		        	compileCmdArray[2] = genDir + "/submitted_count.bc";
+		        	compileCmdArray[3] = "-o";
+		        	compileCmdArray[4] = genDir + "/submitted_count_linked.bc";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(tmpFile.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+		        	//llc-5.0 sample_linked.bc
+		        	compileCmdArray = new String[2];
+		        	compileCmdArray[0] = "llc-5.0";
+		        	compileCmdArray[1] = genDir + "/submitted_count_linked.bc";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(tmpFile.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+		        	//clang-5.0 sample_linked.s -o sample_linked.out
+		        	compileCmdArray = new String[5];
+		        	compileCmdArray[0] = "clang-5.0";
+		        	compileCmdArray[1] = "-O3";
+		        	compileCmdArray[2] = genDir + "/submitted_count_linked.s";
+		        	compileCmdArray[3] = "-o";
+		        	compileCmdArray[4] = genDir + "/submitted.out";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(tmpFile.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+		        	/*
+		        	compileCmdArray = new String[3];
+		        	compileCmdArray[0] = "gcc";
+		        	compileCmdArray[1] = genDir + "/submitted.c";
+		        	compileCmdArray[2] = "-o"+genDir+"/submitted.out";
+		        	nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(nativeOutput);
+		        	*/
+	        	}
+	        	else
+	        	{
+	        		compileCmdArray = new String[5];
+		        	compileCmdArray[0] = "clang-5.0";
+		        	compileCmdArray[1] = "-O3";
+		        	compileCmdArray[2] = genDir + "/grading.c";
+		        	compileCmdArray[3] = "-o";
+		        	compileCmdArray[4] = genDir + "/grading.out";
+		        	String nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	//nativeOutput = nativeInterface.executeCommand(compileCmdArray, tmpFile, environmentalVars);
+		        	System.out.println(tmpFile.getAbsolutePath());
+		        	System.out.println(nativeOutput);
+		        	
+	        	}
 	        	
 	        	DBObj previousMap = (DBObj) gradeChallenge.get(0);
 	        	ArrayList testArgs = new ArrayList();
@@ -377,8 +443,8 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	        			int numIterations = (int)previousMap.getAttribute("num_iterations");
 	        			int numFailures = 0;
 	        			int numPerformanceFailures = 0;
+	        			toEmail += "Testing " + numIterations + " values.";
 	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Testing " + numIterations + " values." + " <br />\";</script>");
-	        			toEmail += "Testing " + numIterations + " values." + "\n";
 	        			for(int y=0; y<1000; y++)
 	    	        	{
 	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
@@ -392,22 +458,44 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	        				int numArgs = testArgs.size();
     	    	        	System.out.println("Testing with " + numArgs + " args.");
     	    	        	
-    	    	        	String[] runCmdArray = new String[numArgs + 6];
+    	    	        	int numSubmittedArgs = 0;
+    	    	        	//System.out.println(testArgs);
+    	    	        	for(int z=0; z<testArgs.size(); z++)
+    	    	        	{
+    	    	        		DBObj gradeObj = (DBObj) testArgs.get(z);
+    	    	        		//System.out.println("Got " + gradeObj.getAttributeNames());
+    	    	        		int origOnly = (int) gradeObj.getAttribute("orig_only");
+    	    	        		if(!(origOnly == 1))
+    	    	        		{
+    	    	        			numSubmittedArgs++;
+    	    	        		}
+    	    	        	}
+    	    	        	
+    	    	        	System.out.println(numArgs + " arguments for orig");
+    	    	        	System.out.println(numSubmittedArgs + " arguments for sub");
+    	    	        	String[] runCmdArray = new String[numArgs + 5];
+    	    	        	String[] runCmdArraySubmitted = new String[numSubmittedArgs + 5];
     	    	        	
     	    	        	runCmdArray[0] = "firejail";
     	    	        	runCmdArray[1] = "--quiet";
+    	    	        	runCmdArraySubmitted[0] = "firejail";
+    	    	        	runCmdArraySubmitted[1] = "--quiet";
     	    	        	//runCmdArray[2] = "--whitelist="+genDir+"/submitted.out";
     	    	        	//runCmdArray[3] = "--read-write="+genDir+"/submitted.out";
-    	    	        	runCmdArray[2] = "--noprofile";
+    	    	        	//runCmdArray[2] = "--noprofile";
     	    	        	//runCmdArray[3] = "--private";//=" + sc.getRealPath("/WEB-INF/");
     	    	        	//runCmdArray[4] = "--whitelist="+genDir+"/submitted.out";
-    	    	        	runCmdArray[4] = "--overlay";
-    	    	        	runCmdArray[3] = "--net=none";
+    	    	        	runCmdArray[3] = "--overlay-tmpfs";
+    	    	        	runCmdArray[2] = "--net=none";
+    	    	        	runCmdArraySubmitted[3] = "--overlay-tmpfs";
+    	    	        	runCmdArraySubmitted[2] = "--net=none";
     	    	        	//runCmdArray[3] = "--blacklist=/";
     	    	        	//runCmdArray[2] = "--noblacklist="+genDir+"/submitted.out";
+    	    	        	int submittedNum = 0;
 	        				for(int z=0; z<testArgs.size(); z++)
 	        				{
 	        					DBObj gradeObj = (DBObj) testArgs.get(z);
+	        					int origOnly = (int) gradeObj.getAttribute("orig_only");
 	        					//System.out.println(gradeObj.attributes);
 	        					String value = (String) gradeObj.getAttribute("arg_value");
 	    	        			if(value == null || value.isEmpty())
@@ -417,7 +505,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        				{
 	    	        					Random tmpRand = new SecureRandom();
 	    	        					long tmpLong = tmpRand.nextLong();
-	    	        					while(tmpLong > Math.pow(10, y + 1) || -tmpLong > Math.pow(10, y + 1))
+	    	        					while(Math.abs(tmpLong) > Math.pow(10, y + 1))
 	    	        					{
 	    	        						tmpLong = tmpLong/2;
 	    	        					}
@@ -427,24 +515,22 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        				{
 	    	        					Random tmpRand = new SecureRandom();
 	    	        					int tmpInt = tmpRand.nextInt();
-	    	        					while(tmpInt > Math.pow(10, y + 1) || -tmpInt > Math.pow(10, y + 1))
+	    	        					while(Math.abs(tmpInt) > Math.pow(10, y + 1))
 	    	        					{
 	    	        						tmpInt = tmpInt/2;
 	    	        					}
 	    	        					value = ((Integer)tmpInt).toString();
 	    	        				}
 	    	        			}
-	    	        			runCmdArray[6+z] = value;
-	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Testing case: " + value + " <br />\";</script>");
-	    	        			toEmail += "Testing case: " + value + "\n";
-	    	        			for(int p=0; p<1000; p++)
-	    	    	        	{
-	    	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
-	    	    	        	}
-	    	        			redirectWriter.flush();
-	    	    	    		response.flushBuffer();
+	    	        			runCmdArray[5+z] = value;
+	    	        			if(!(origOnly == 1))
+    	    	        		{
+	    	        				runCmdArraySubmitted[5+submittedNum] = value;
+    	    	        			submittedNum++;
+    	    	        		}
+	    	        			
 	        				}
-	        				runCmdArray[5] = genDir+"/grading.out";
+	        				runCmdArray[4] = genDir+"/grading.out";
 	    	        		
 	    	        		String argString = "Running grading with: ";
 	    	        		for(int z=0; z<runCmdArray.length; z++)
@@ -463,34 +549,11 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        			outputForce.add(((DBObj)outputInput.get(z)).getAttribute("input_string"));
 	    	        		}
 	    	        		
-	    	        		String gradingOutput = nativeInterface.executeCommand(runCmdArray, tmpFile, environmentalVars, 1500000000, outputForce);
+	    	        		String gradingOutput = nativeInterface.executeCommand(runCmdArray, tmpFile, environmentalVars, 500000000, outputForce);
 	    	        		
-	    	        		runCmdArray[5] = genDir+"/submitted.out";
-	    	        		String submittedOutput = nativeInterface.executeCommand(runCmdArray, tmpFile, environmentalVars, 1500000000, outputForce);
+	    	        		runCmdArraySubmitted[4] = genDir+"/submitted.out";
+	    	        		String submittedOutput = nativeInterface.executeCommand(runCmdArraySubmitted, tmpFile, environmentalVars, 500000000, outputForce);
 	    	        		
-	    	        		
-	    	        		if(submittedOutput.contains("Err: Timeout"))
-	    	        		{
-	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Code too slow: timeout." + " <br />\";</script>");
-	    	        			toEmail += "Code too slow: timeout." + "\n";
-	    	        			for(int z=0; z<1000; z++)
-	    	    	        	{
-	    	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
-	    	    	        	}
-	    	        			redirectWriter.flush();
-	    	    	    		response.flushBuffer();
-	    	        		}
-	    	        		if(gradingOutput.contains("Err: Timeout"))
-	    	        		{
-	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Server too busy, timeout on original code." + " <br />\";</script>");
-	    	        			toEmail += "Server too busy, timeout on original code." + "\n";
-	    	        			for(int z=0; z<1000; z++)
-	    	    	        	{
-	    	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
-	    	    	        	}
-	    	        			redirectWriter.flush();
-	    	    	    		response.flushBuffer();
-	    	        		}
 	    	        		//System.out.println(gradingOutput);
 	    	        		
 	    	        		Scanner tmpScanner = new Scanner(gradingOutput);
@@ -524,7 +587,11 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        						String nextLine = tmpScanner.nextLine();
 	    	        						Scanner lineScanner = new Scanner(nextLine);
 	    	        						String instructionType = lineScanner.next();
-	    	        						int count = lineScanner.nextInt();
+	    	        						int count = Integer.MAX_VALUE;
+	    	        						if(lineScanner.hasNextInt())
+	    	        						{
+		    	        						count = lineScanner.nextInt();
+	    	        						}
 	    	        						instructionType = instructionType.replace(":", "");
 	    	        						//System.out.println(instructionType + ", " + count);
 	    	        						gradingPerformance.put(instructionType, count);
@@ -619,28 +686,12 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 		    	        		}
 	    	        			if(perfFail)
 	    	        			{
-	    	        				redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Fail: Code executes too many instructions." + " <br />\";</script>");
-	    	        				toEmail += "Fail: Code executes too many instructions." + "\n";
 	    	        				numPerformanceFailures++;
-	    	        				for(int z=0; z<1000; z++)
-	    		    	        	{
-	    		    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
-	    		    	        	}
-	    	        				redirectWriter.flush();
-	    		    	    		response.flushBuffer();
 	    	        			}
 	    	        		}
 	    	        		else
 	    	        		{
-	    	        			redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Fail: Input/output incorrect." + " <br />\";</script>");
-	    	        			toEmail += "Fail: Input/output incorrect." + "\n";
 	    	        			numFailures++;
-	    	        			for(int z=0; z<1000; z++)
-	    	    	        	{
-	    	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
-	    	    	        	}
-	    	        			redirectWriter.flush();
-	    	    	    		response.flushBuffer();
 	    	        		}
 	        			}
 	        			System.out.println("Failed " + numFailures + " out of " + numIterations);
@@ -675,8 +726,8 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	    	        			textToInsert += "performance.";
 	    	        		}
 	    	        	}
+	    	        	toEmail += "\n" + textToInsert;
 	    	        	redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + textToInsert + " <br />\";</script>");
-	    	        	toEmail += textToInsert + "\n";
 	    	        	for(int y=0; y<1000; y++)
 	    	        	{
 	    	        		redirectWriter.println("<div style=\"display:none\">#</div>");
@@ -817,7 +868,7 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 	        	String clean = nativeInterface.executeCommand(firejailClean, tmpFile, environmentalVars);
 	        	System.out.println("Cleaning..." + clean);
 	        	*/
-	        	FileUtils.deleteDirectory(genDir);
+	        	//FileUtils.deleteDirectory(genDir);
 			}
 			catch(Exception e)
 			{
@@ -830,8 +881,15 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 			if(uploadDataBool)
 			{
 				//response.sendRedirect("activateDataUpload.jsp");
-				//redirectWriter.println("<html><head><meta http-equiv=\"refresh\" content=\"2; url=activateDataUpload.jsp\" /></head><body>Redirecting</html>");
-				redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Done!" + " <br />\";</script>");
+				redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Done!  Beginning data upload." + " <br />\";</script>");
+				if(redirectTo == null || redirectTo.equals(""))
+				{
+					redirectWriter.println("<meta http-equiv=\"refresh\" content=\"2; url=activateDataUpload.jsp\" />");
+				}
+				else
+				{
+					redirectWriter.println("<meta http-equiv=\"refresh\" content=\"2; url=activateDataUpload.jsp?redirect=" + redirectTo + "\" />");
+				}
 				redirectWriter.flush();
 				response.flushBuffer();
 			}
@@ -839,22 +897,28 @@ public class ChallengeDeobfuscatedSubmissionServlet extends HttpServlet
 			{
 				//response.sendRedirect("myChallenges.jsp");
 				//redirectWriter.println("<html><head><meta http-equiv=\"refresh\" content=\"2; url=myChallenges.jsp\" /></head></html>");
+				toEmail += "\nDone!";
 				redirectWriter.println("<script>document.getElementById(\"gradeContent\").innerHTML += \"" + "Done!" + " <br />\";</script>");
+				if(redirectTo != null && (!redirectTo.equals("")))
+				{
+					redirectWriter.println("<meta http-equiv=\"refresh\" content=\"2; url=" + redirectTo + "\" />");
+				}
+				
 				redirectWriter.flush();
 				response.flushBuffer();
 			}
 			redirectWriter.flush();
 			response.flushBuffer();
+			mySender.sendEmail((String)myUser.getAttribute("email"), "Submission Received for " + challengeName, toEmail);
 		}
 		else
 		{
 			PrintWriter redirectWriter = response.getWriter();
-			redirectWriter.println("<html><head><meta http-equiv=\"refresh\" content=\"0; url=myChallenges.jsp?alert_message=Submission received!\" /></head></html>");
+			//redirectWriter.println("<html><head><meta http-equiv=\"refresh\" content=\"0; url=myChallenges.jsp\" /></head></html>");
 			redirectWriter.flush();
 			response.flushBuffer();
 		}
 		response.flushBuffer();
-		mySender.sendEmail((String)myUser.getAttribute("email"), "Submission Received for " + challengeName, toEmail);
 	}
 
 	/**
