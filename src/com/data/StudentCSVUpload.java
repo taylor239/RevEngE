@@ -96,9 +96,16 @@ public class StudentCSVUpload extends HttpServlet {
 			String password = UUID.randomUUID().toString();
 			tmp.put("password", password);
 			
+			try
+			{
 			myConnector.writeUser((String)tmp.get("email"), (String)tmp.get("email"), (String)tmp.get("fname"), "", (String)tmp.get("lname"), password, "student", (String)myUser.getAttribute("email"), courseName);
 			
 			finalList.add(tmp);
+			}
+			catch(Exception e)
+			{
+				e.printStackTrace();
+			}
 		}
 		
 		request.setAttribute("studentsAdded", finalList);

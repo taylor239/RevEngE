@@ -25,7 +25,6 @@
 	<classpathentry exported="true" kind="lib" path="WebContent/WEB-INF/lib/imap.jar"/>
 	<classpathentry exported="true" kind="lib" path="WebContent/WEB-INF/lib/mail.jar"/>
 	<classpathentry exported="true" kind="lib" path="WebContent/WEB-INF/lib/mailapi.jar"/>
-	<classpathentry exported="true" kind="lib" path="WebContent/WEB-INF/lib/mysql-connector-java-5.0.8-bin.jar"/>
 	<classpathentry exported="true" kind="lib" path="WebContent/WEB-INF/lib/pop3.jar"/>
 	<classpathentry exported="true" kind="lib" path="WebContent/WEB-INF/lib/smtp.jar"/>
 	<classpathentry kind="lib" path="WebContent/WEB-INF/lib/commons-dbcp2-2.6.0-javadoc.jar"/>
@@ -40,5 +39,6 @@
 	<classpathentry kind="lib" path="WebContent/WEB-INF/lib/commons-pool2-2.6.2-test-sources.jar"/>
 	<classpathentry kind="lib" path="WebContent/WEB-INF/lib/commons-pool2-2.6.2-tests.jar"/>
 	<classpathentry kind="lib" path="WebContent/WEB-INF/lib/commons-pool2-2.6.2.jar"/>
+	<classpathentry kind="lib" path="WebContent/WEB-INF/lib/mysql-connector-java-8.0.21.jar"/>
 	<classpathentry kind="output" path="build/classes"/>
 </classpath>

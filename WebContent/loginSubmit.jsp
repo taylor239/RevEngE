@@ -24,6 +24,7 @@
 		{
 			displayName=(String)myUser.getAttribute("username");
 		}
+		myConnector.syncChallengesNoReassign(myUser, sc);
 	}
 	else
 	{

@@ -69,6 +69,7 @@ public class DatabaseConnector
 	 */
 	public DatabaseConnector(String name)
 	{
+		System.out.println("Connecting to " + name);
 		databaseName = name;
 		databaseMap = DatabaseInformationManager.getInstance().getNext(databaseName);
 		mySource = new TestingConnectionSource((String)databaseMap.get("username"), (String)databaseMap.get("password"), (String)databaseMap.get("address"));
@@ -117,7 +118,10 @@ public class DatabaseConnector
 	public synchronized void disconnect(Connection myConnection)
 	{
 		try {
+			if(myConnection != null)
+			{
 			myConnection.close();
+			}
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -218,7 +222,7 @@ public class DatabaseConnector
 		Connection connection = getConnection();
 		if(verbose)
 		{
-			System.out.println("Connector got connection");
+			System.out.println("Connector got connection: " + connection!=null );
 		}
 		ConcurrentHashMap attributes=new ConcurrentHashMap();
 		try
@@ -228,11 +232,13 @@ public class DatabaseConnector
 			myStmt.setString(2, password);
 			myStmt.setString(3, username);
 			ResultSet myResults=myStmt.executeQuery();
+			System.out.println("executing sign in query");
 			//disconnect(connection);
 			ResultSetMetaData meta=myResults.getMetaData();
 			int columns=meta.getColumnCount();
 			if(myResults.next())
 			{
+				System.out.println("Got results");
 				for(int x=1; x<=columns; x++)
 				{
 					if(meta.getColumnLabel(x).equals("password") || meta.getColumnLabel(x).equals("salt"))
@@ -1527,6 +1533,23 @@ public class DatabaseConnector
 		}
 	}
 	
+	public synchronized void syncChallengesNoReassign(User myUser, ServletContext sc)
+	{
+		//ArrayList allChallenges = getAdminChallenges(admin);
+		ArrayList assigned = (ArrayList)getChallenges((String) myUser.getAttribute("email"));
+		ArrayList challengeNames = new ArrayList();
+		for(int x=0; x<assigned.size(); x++)
+		{
+			DBObj curObj = (DBObj)assigned.get(x);
+			if((Integer)(curObj).getAttribute("code_generated") == 0)
+			{
+				CodeGeneratorPool curPool = CodeGeneratorPool.getInstance();
+				String curName = (String)curObj.getAttribute("challenge_name");
+	        	curPool.insertGeneration(this, myUser, sc, curName);
+			}
+		}
+	}
+	
 	public void assignChallenge(String challengeName, String email)
 	{
 		Connection connection = getConnection();
@@ -2599,7 +2622,7 @@ public class DatabaseConnector
 		}
 	}
 	
-	public synchronized void writeUser(String username, String email, String fname, String mname, String lname, String password, String role, String administrator, String courseName)
+	public synchronized void writeUser(String username, String email, String fname, String mname, String lname, String password, String role, String administrator, String courseName) throws Exception
 	{
 		courseName = courseName.replaceAll(" ", "_");
 		String salt = UUID.randomUUID().toString();
@@ -2636,6 +2659,7 @@ public class DatabaseConnector
 		{
 			e.printStackTrace();
 			disconnect(connection);
+			throw e;
 			//return;
 		}
 		disconnect(connection);

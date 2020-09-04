@@ -165,6 +165,7 @@
         }
         else if(myUser.getAttribute("role").equals("student") || myUser.getAttribute("role").equals("admin"))
         {
+        myConnector.syncChallengesNoReassign(myUser, sc);
         ArrayList myChallenges = myConnector.getChallenges((String)myUser.getAttribute("email"));
         if(verbose)
         {
@@ -444,9 +445,7 @@
 	        if((Integer)((DBObj)myChallenges.get(x)).getAttribute("code_generated") == 0)
 	        {
 	        %>
-	        <a href="generateCode.jsp?challengeName=<%= ((DBObj)myChallenges.get(x)).getAttribute("challenge_name") %>">
-	        Generate
-	        </a>
+	        Generating, please reload.
 	        <%
 	        }
 	        else

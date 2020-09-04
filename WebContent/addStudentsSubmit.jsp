@@ -24,12 +24,13 @@
         ArrayList courseList = new ArrayList();
 		if(!hasUser || !(myUser.getAttribute("role").equals("admin")))
 		{
-			
+			System.out.println("Not admin, cannot add students");
 		}
 		else
 		{
 			Integer totalToAdd = new Integer(request.getParameter("totalAdd"));
 			//out.print(totalToAdd);
+			System.out.println("Adding " + totalToAdd);
 			for(int x=0; x<=totalToAdd; x++)
 			{
 				//out.print(x);
@@ -43,13 +44,21 @@
 				{
 					password = UUID.randomUUID().toString();
 				}
-				myConnector.writeUser(email, email, fname, mname, lname, password, "student", (String)myUser.getAttribute("email"), course);
-				emailList.add(email);
-				fnameList.add(fname);
-				mnameList.add(mname);
-				lnameList.add(lname);
-				passwordList.add(password);
-				courseList.add(course);
+				try
+				{
+					myConnector.writeUser(email, email, fname, mname, lname, password, "student", (String)myUser.getAttribute("email"), course);
+					emailList.add(email);
+					fnameList.add(fname);
+					mnameList.add(mname);
+					lnameList.add(lname);
+					passwordList.add(password);
+					courseList.add(course);
+				}
+				catch(Exception e)
+				{
+					System.out.println(email);
+					e.printStackTrace();
+				}
 				//out.print(password);
 			}
 		}

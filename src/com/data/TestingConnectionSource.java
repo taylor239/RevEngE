@@ -55,6 +55,7 @@ public class TestingConnectionSource implements Runnable
 		password = thePwd;
 		address = theAddr;
 		
+		System.out.println(theUser + ", " + theAddr);
 		try
 		{
 			Class.forName("com.mysql.jdbc.Driver");
